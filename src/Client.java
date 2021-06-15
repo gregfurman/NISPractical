@@ -1,8 +1,12 @@
 import javax.crypto.CipherInputStream;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Base64;
 
 
 public class Client {
@@ -63,8 +67,7 @@ public class Client {
                     while ((byteArray = recieveBytes()) != null) {
                         // Decryption!!
 
-
-                        System.out.println(new String(byteArray));
+                        System.out.println(new String(decryptMessage(byteArray)));
                     }
 
 
@@ -127,12 +130,51 @@ public class Client {
         sender.start();
         reciever.start();
 
-
     }
 
 
     private void sendMessage(String message) throws IOException{
         sendBytes(message.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void encryptMessage(String message){
+
+        try {
+            SecretKey key = crypto.generateSecretKey();
+            IvParameterSpec iv = crypto.generateInitialisationVector();
+
+            byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+            byte[] encryptedKey = crypto.encryptSecretKey(key);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
+            outputStream.write( encryptedKey );
+            outputStream.write(iv.getIV());
+            outputStream.write( encryptedMessage );
+
+            sendBytes(outputStream.toByteArray());
+
+
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    private byte[] decryptMessage(byte[] data){
+
+        byte[] decryptedMessage = {};
+        try {
+
+            SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
+            IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
+            decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
+            return decryptedMessage;
+
+
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return decryptedMessage;
     }
 
     private void sendBytes(String message) throws IOException{
