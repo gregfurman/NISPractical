@@ -3,6 +3,9 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 
 
 public class Client {
@@ -110,9 +113,19 @@ public class Client {
     public void start(){
 
         try {
-            sendBytes(crypto.getPublicKey().getEncoded());
 
-            crypto.setKUb(recieveBytes());
+            CA authority = new CA();
+            X509Certificate myID = authority.createCertificate("CN=Test, C=CapeTown, C=ZA", crypto.getPublicKey());
+            System.out.println("sending bob certificate");
+            sendBytes(myID.getEncoded());
+
+            byte [] senderCertificate = recieveBytes();
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            ByteArrayInputStream bais = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(bais);
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+
+            System.out.println("Received bob's certificate");
 
         } catch (Exception e){
             System.out.println("Failed to send public key.");
