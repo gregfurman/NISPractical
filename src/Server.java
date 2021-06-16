@@ -41,6 +41,7 @@ public class Server{
 
         try {
             crypto = new Cryptography();
+
         } catch (NoSuchAlgorithmException a){
             System.out.println("Fatal error: RSA-key generation failed.");
             System.exit(1);
