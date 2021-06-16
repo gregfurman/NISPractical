@@ -1,13 +1,13 @@
 import javax.crypto.CipherOutputStream;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Base64;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 
 public class Server{
 
@@ -99,8 +99,8 @@ public class Server{
                     while (!(message = keyboardInput.readLine()).equals("quit")) {
                         // Encrpytion!!
 
-                        encryptMessage(message);
-//                        sendBytes(message);
+//                        encryptMessage(message);
+                        sendBytes(message);
 
 
 
@@ -120,8 +120,19 @@ public class Server{
 
         // Diffie hellman?
         try {
-            sendBytes(crypto.getPublicKey().getEncoded());
-            crypto.setKUb(recieveBytes());
+            CA authority = new CA();
+            X509Certificate myID = authority.createCertificate("CN=Test, C=CapeTown, C=ZA", crypto.getPublicKey());
+
+            System.out.println("Sending alice certificate");
+            sendBytes(myID.getEncoded());
+
+            byte [] senderCertificate = recieveBytes();
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            ByteArrayInputStream bais = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(bais);
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+
+            System.out.println("Received alice's certificate");
 
         } catch (Exception e){
             System.out.println("Failed to send public key.");
@@ -143,40 +154,17 @@ public class Server{
 
         try {
             SecretKey key = crypto.generateSecretKey();
-            IvParameterSpec iv = crypto.generateInitialisationVector();
 
-            byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+            byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key);
             byte[] encryptedKey = crypto.encryptSecretKey(key);
 
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-            outputStream.write( encryptedKey );
-            outputStream.write(iv.getIV());
-            outputStream.write( encryptedMessage );
-
-            sendBytes(outputStream.toByteArray());
-
+//            System.out.println(encryptedMessage.length);
+//            System.out.println(encryptedKey.length);
+//            sendBytes();
 
         } catch (Exception e){
             e.printStackTrace();
         }
-    }
-
-    private byte[] decryptMessage(byte[] data){
-
-        byte[] decryptedMessage = {};
-        try {
-
-            SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
-            IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
-            decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
-            return decryptedMessage;
-
-
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-
-        return decryptedMessage;
     }
 
     private byte[] recieveBytes() throws IOException {
