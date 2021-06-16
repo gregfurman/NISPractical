@@ -100,14 +100,14 @@ public class Cryptography {
         return new IvParameterSpec(IV);
     }
 
-    public String privateKeyEncrypt(byte[] M) throws Exception {
+    public byte[] privateKeyEncrypt(byte[] M) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_MODE);
 
         cipher.init(Cipher.ENCRYPT_MODE,KR);
 
         byte[] encrypted_bytes = cipher.doFinal(M);
 
-        return new sun.misc.BASE64Encoder().encode(encrypted_bytes);
+        return Base64.getEncoder().encode(encrypted_bytes);
 
     }
 
@@ -137,8 +137,6 @@ public class Cryptography {
 
         cipher.init(Cipher.DECRYPT_MODE,KR);
         System.out.println(M.length);
-//        String encodedMessage = new String(M,"UTF-8");
-//        byte[] decryptedMessageBytes = cipher.doFinal(M);
 
         return new String(cipher.doFinal(M),StandardCharsets.UTF_8);
 
@@ -146,8 +144,6 @@ public class Cryptography {
 
     public String publicKeyDecrypt(byte[] M) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-
-       // byte[] encrypted = new sun.misc.BASE64Decoder().decodeBuffer(M);
 
         cipher.init(Cipher.DECRYPT_MODE,KR);
 
