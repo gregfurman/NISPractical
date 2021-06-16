@@ -1,5 +1,6 @@
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -12,8 +13,9 @@ import java.util.zip.GZIPInputStream;
 public class Cryptography {
 
     private final int MAX_BLOCK_SIZE = 256;
+    private final int AES_BLOCK_SIZE = 32;
 
-    private final String CIPHER_MODE = "RSA/ECB/OAEPWITHSHA-256ANDMGF1PADDING";
+    private final String CIPHER_MODE = "RSA/ECB/PKCS1Padding";
 
     private PublicKey KU;
     private PrivateKey KR;
@@ -25,6 +27,7 @@ public class Cryptography {
         CA = new CertificateAuthority();
         KU = CA.getPublic();
         KR = CA.getPrivate();
+
     }
 
     public void setKUb(byte[] KUb) throws Exception {
@@ -52,29 +55,42 @@ public class Cryptography {
 
     }
 
-    public byte[] encryptWithSecretKey(String message, SecretKey secretKey) throws Exception{
+    public byte[] encryptWithSecretKey(String message, SecretKey secretKey, IvParameterSpec iv) throws Exception{
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey,generateInitialisationVector());
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
+
         return cipher.doFinal(message.getBytes());
 
-
     }
+
 
     public byte[] encryptSecretKey(SecretKey secretKey)throws Exception{
 
         Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         cipher.init(Cipher.ENCRYPT_MODE, KUb);
+
         return cipher.doFinal(secretKey.getEncoded());
 
     }
 
 
-    public byte[] decryptSecretKey(byte[] secretKey)throws Exception{
+    public SecretKey decryptSecretKey(byte[] encodedSecretKey)throws Exception{
 
         Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        cipher.init(Cipher.DECRYPT_MODE, KUb);
-        return cipher.doFinal(secretKey);
+        cipher.init(Cipher.DECRYPT_MODE, KR);
+
+        byte[] encryptedSecretKey = cipher.doFinal(encodedSecretKey);
+
+        return new SecretKeySpec(encryptedSecretKey, 0, AES_BLOCK_SIZE, "AES");
+
+    }
+
+    public byte[] decryptWithSecretKey(byte[] data,SecretKey secretKey, IvParameterSpec iv)throws Exception{
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, secretKey,iv);
+        return cipher.doFinal(data);
 
     }
 
@@ -84,14 +100,14 @@ public class Cryptography {
         return new IvParameterSpec(IV);
     }
 
-    public String privateKeyEncrypt(byte[] M) throws Exception {
+    public byte[] privateKeyEncrypt(byte[] M) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_MODE);
 
         cipher.init(Cipher.ENCRYPT_MODE,KR);
 
         byte[] encrypted_bytes = cipher.doFinal(M);
 
-        return new sun.misc.BASE64Encoder().encode(encrypted_bytes);
+        return Base64.getEncoder().encode(encrypted_bytes);
 
     }
 
@@ -121,8 +137,6 @@ public class Cryptography {
 
         cipher.init(Cipher.DECRYPT_MODE,KR);
         System.out.println(M.length);
-//        String encodedMessage = new String(M,"UTF-8");
-//        byte[] decryptedMessageBytes = cipher.doFinal(M);
 
         return new String(cipher.doFinal(M),StandardCharsets.UTF_8);
 
@@ -130,8 +144,6 @@ public class Cryptography {
 
     public String publicKeyDecrypt(byte[] M) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-
-       // byte[] encrypted = new sun.misc.BASE64Decoder().decodeBuffer(M);
 
         cipher.init(Cipher.DECRYPT_MODE,KR);
 
