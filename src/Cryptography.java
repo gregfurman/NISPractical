@@ -91,7 +91,7 @@ public class Cryptography {
 
         byte[] encrypted_bytes = cipher.doFinal(M);
 
-        return new sun.misc.BASE64Encoder().encode(encrypted_bytes);
+        return ""; //new sun.misc.BASE64Encoder().encode(encrypted_bytes);
 
     }
 
