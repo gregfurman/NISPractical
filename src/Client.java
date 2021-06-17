@@ -3,6 +3,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -113,22 +114,29 @@ public class Client {
     public void start(){
 
         try {
-
-            CA authority = new CA();
-            X509Certificate myID = authority.createCertificate("CN=Test, C=CapeTown, C=ZA", crypto.getPublicKey());
-            System.out.println("sending bob certificate");
+            //Creates a certificate and sends it to server
+            X509Certificate myID = CA.createCertificate("CN=BOB, C=CapeTown, C=ZA", crypto.getPublicKey());
+            System.out.println("Sending Alice my certificate (I'm Bob) ");
             sendBytes(myID.getEncoded());
 
+            // Received bytes from server and converts it to a certificate
             byte [] senderCertificate = recieveBytes();
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            ByteArrayInputStream bais = new ByteArrayInputStream(senderCertificate);
-            Certificate certificate = cf.generateCertificate(bais);
-            crypto.setKUb(certificate.getPublicKey().getEncoded());
-
+            ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(aliceCertificate);
             System.out.println("Received alice's certificate");
 
+            // Retrieves authorities public key and verifies the certificate
+            PublicKey AuthorityPubKey = CA.getPublicKey();
+            certificate.verify(AuthorityPubKey);
+            System.out.println("Verified alice's certificate");
+
+            // Retrieves server public key from the certificate and saves it.
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+            System.out.println("Received alice's public key");
+
         } catch (Exception e){
-            System.out.println("Failed to send public key.");
+            System.out.println("Failed to send Certificate.");
             e.printStackTrace();
             System.exit(0);
         }

@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -117,25 +118,30 @@ public class Server{
     }
 
     public void start(){
-
-        // Diffie hellman?
         try {
-            CA authority = new CA();
-            X509Certificate myID = authority.createCertificate("CN=Test, C=CapeTown, C=ZA", crypto.getPublicKey());
-
-            System.out.println("Sending alice certificate");
+            //Creates a certificate and sends it to client
+            X509Certificate myID = CA.createCertificate("CN=Alice, C=CapeTown, C=ZA", crypto.getPublicKey());
+            System.out.println("Sending Bob my certificate (I'm Alice) ");
             sendBytes(myID.getEncoded());
 
+            // Received bytes from client and converts it to a certificate
             byte [] senderCertificate = recieveBytes();
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            ByteArrayInputStream bais = new ByteArrayInputStream(senderCertificate);
-            Certificate certificate = cf.generateCertificate(bais);
-            crypto.setKUb(certificate.getPublicKey().getEncoded());
-
+            ByteArrayInputStream bobCertificate = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(bobCertificate);
             System.out.println("Received bob's certificate");
 
+            // Retrieves authorities public key and verifies the certificate
+            PublicKey AuthorityPubKey = CA.getPublicKey();
+            certificate.verify(AuthorityPubKey);
+            System.out.println("Verified bob's certificate");
+
+            // Retrieves clients public key from the certificate and saves it.
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+            System.out.println("Received bob's public key");
+
         } catch (Exception e){
-            System.out.println("Failed to send public key.");
+            System.out.println("Failed to send Certificate.");
             e.printStackTrace();
             System.exit(0);
         }
@@ -146,7 +152,6 @@ public class Server{
         sender.start();
         receiver.start();
 
-
     }
 
 
@@ -155,7 +160,7 @@ public class Server{
         try {
             SecretKey key = crypto.generateSecretKey();
 
-            byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key);
+            //byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key);
             byte[] encryptedKey = crypto.encryptSecretKey(key);
 
 //            System.out.println(encryptedMessage.length);
