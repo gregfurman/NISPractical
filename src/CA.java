@@ -25,7 +25,7 @@ public class CA {
     }
 
     /**
-     * Generates the certificate signed by the CA
+     * Generates the certificate signed by the CA using x.509 format
      * @param senderName the ID of the sender (entity requesting the certificate)
      * @param senderPubKey the public key of the sender ((entity requesting the certificate)
      * @return X509Certificate certificate with valid information

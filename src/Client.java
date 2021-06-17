@@ -125,7 +125,7 @@ public class Client {
             Certificate certificate = cf.generateCertificate(bais);
             crypto.setKUb(certificate.getPublicKey().getEncoded());
 
-            System.out.println("Received bob's certificate");
+            System.out.println("Received alice's certificate");
 
         } catch (Exception e){
             System.out.println("Failed to send public key.");
