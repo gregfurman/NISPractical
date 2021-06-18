@@ -1,13 +1,12 @@
 import javax.crypto.CipherInputStream;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.zip.GZIPOutputStream;
+import java.security.PublicKey;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 
 
 public class Client {
@@ -32,21 +31,16 @@ public class Client {
 
         } catch (IOException e){
             System.out.println("No server found.");
+        }  catch (NoSuchAlgorithmException a){
+            System.out.println("Fatal error: RSA key pairs failed to load/generate.");
         }
 
     }
 
 
-    public Client(String address,int portNumber) throws IOException {
+    public Client(String address,int portNumber) throws IOException, NoSuchAlgorithmException {
 
-        try {
-            crypto = new Cryptography();
-        } catch (NoSuchAlgorithmException a){
-            System.out.println("Fatal error: RSA-key generation failed.");
-            System.exit(1);
-        }
-
-
+        crypto = new Cryptography();
         clientSocket = new Socket(address, portNumber);
 
         output = new DataOutputStream(clientSocket.getOutputStream());
@@ -70,6 +64,7 @@ public class Client {
 
                         // Decryption!!
                         System.out.println(new String(decryptMessage(byteArray)));
+
                     }
 
                     clientSocket.close();
@@ -113,24 +108,42 @@ public class Client {
     public void start(){
 
         try {
-            sendBytes(crypto.getPublicKey().getEncoded());
-            crypto.setKUb(receiveBytes());
+            //Creates a certificate and sends it to server
+            X509Certificate myID = CA.createCertificate("CN=BOB, C=CapeTown, C=ZA", crypto.getPublicKey());
+            System.out.println("Sending Alice my certificate (I'm Bob) ");
+            sendBytes(myID.getEncoded());
+
+            // Received bytes from server and converts it to a certificate
+            byte [] senderCertificate = recieveBytes();
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(aliceCertificate);
+            System.out.println("Received alice's certificate");
+
+            // Retrieves authorities public key and verifies the certificate
+            PublicKey AuthorityPubKey = CA.getPublicKey();
+            certificate.verify(AuthorityPubKey);
+            System.out.println("Verified alice's certificate");
+
+            // Retrieves server public key from the certificate and saves it.
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+            System.out.println("Received alice's public key");
 
             Thread sender = senderThread();
-            Thread receiver = receiverThread();
+            Thread reciever = recieverThread();
 
             sender.start();
-            receiver.start();
-
+            reciever.start();
+        
         } catch (Exception e){
-            System.out.println("Failed to send public key.");
+            System.out.println("Failed to send Certificate.");
             e.printStackTrace();
         }
+
 
     }
 
     private byte[] encryptMessage(String message) throws Exception{
-
 
         SecretKey key = crypto.generateSecretKey();
         IvParameterSpec iv = crypto.generateInitialisationVector();
@@ -145,8 +158,6 @@ public class Client {
 
         return outputStream.toByteArray();
 
-
-
     }
 
     private byte[] decryptMessage(byte[] data) throws Exception{
@@ -160,9 +171,6 @@ public class Client {
     }
 
     private void sendBytes(String message) throws IOException{
-
-
-
 
         byte[] bytes = message.getBytes();
 

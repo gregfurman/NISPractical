@@ -1,15 +1,14 @@
 import javax.crypto.CipherOutputStream;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.zip.GZIPInputStream;
+import java.security.PublicKey;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 
 public class Server{
 
@@ -136,9 +135,27 @@ public class Server{
     public void start(){
 
         try {
-            sendBytes(crypto.getPublicKey().getEncoded());
-            crypto.setKUb(receiveBytes());
+            //Creates a certificate and sends it to client
+            X509Certificate myID = CA.createCertificate("CN=Alice, C=CapeTown, C=ZA", crypto.getPublicKey());
+            System.out.println("Sending Bob my certificate (I'm Alice) ");
+            sendBytes(myID.getEncoded());
 
+            // Received bytes from client and converts it to a certificate
+            byte [] senderCertificate = recieveBytes();
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            ByteArrayInputStream bobCertificate = new ByteArrayInputStream(senderCertificate);
+            Certificate certificate = cf.generateCertificate(bobCertificate);
+            System.out.println("Received bob's certificate");
+
+            // Retrieves authorities public key and verifies the certificate
+            PublicKey AuthorityPubKey = CA.getPublicKey();
+            certificate.verify(AuthorityPubKey);
+            System.out.println("Verified bob's certificate");
+
+            // Retrieves clients public key from the certificate and saves it.
+            crypto.setKUb(certificate.getPublicKey().getEncoded());
+            System.out.println("Received bob's public key");
+            
             Thread sender = senderThread();
             Thread receiver = receiverThread();
 
@@ -146,7 +163,7 @@ public class Server{
             receiver.start();
 
         } catch (Exception e){
-            System.out.println("Failed to send public key.");
+            System.out.println("Failed to send Certificate.");
             e.printStackTrace();
         }
 
