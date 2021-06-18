@@ -31,21 +31,16 @@ public class Client {
 
         } catch (IOException e){
             System.out.println("No server found.");
+        }  catch (NoSuchAlgorithmException a){
+            System.out.println("Fatal error: RSA key pairs failed to load/generate.");
         }
 
     }
 
 
-    public Client(String address,int portNumber) throws IOException {
+    public Client(String address,int portNumber) throws IOException, NoSuchAlgorithmException {
 
-        try {
-            crypto = new Cryptography();
-        } catch (NoSuchAlgorithmException a){
-            System.out.println("Fatal error: RSA-key generation failed.");
-            System.exit(1);
-        }
-
-
+        crypto = new Cryptography();
         clientSocket = new Socket(address, portNumber);
 
         output = new DataOutputStream(clientSocket.getOutputStream());
@@ -57,34 +52,32 @@ public class Client {
 
 
 
-    private Thread recieverThread(){
+    private Thread receiverThread() {
 
         return new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     byte[] byteArray;
-                    while ((byteArray = recieveBytes()) != null) {
+                    // While loop that blocks on the receiveByres method.
+                    while ((byteArray = receiveBytes()) != null) {
+
                         // Decryption!!
+                        System.out.println(new String(decryptMessage(byteArray)));
 
-
-                        System.out.println(new String(byteArray));
                     }
-
 
                     clientSocket.close();
 
-                } catch (Exception e){
-                    e.printStackTrace();
-                    System.out.println("Server disconnected");
-                    System.exit(0);
+                } catch (IOException e) {
+                    System.out.println("Client disconnected.");
+                } catch (Exception e) {
+                    System.out.println("Fatal error: decryption failed.");
                 }
 
             }
         });
-
     }
-
 
     private Thread senderThread(){
 
@@ -96,8 +89,8 @@ public class Client {
                     String message;
 
                     while (!(message = keyboardInput.readLine()).equals("quit")) {
-                        // Encrpytion!!
-                        sendBytes(message);
+
+                        sendBytes(encryptMessage(message));
 
                     }
 
@@ -105,6 +98,7 @@ public class Client {
                     e.printStackTrace();
                 }
 
+                System.exit(0);
             }
         });
 
@@ -135,63 +129,87 @@ public class Client {
             crypto.setKUb(certificate.getPublicKey().getEncoded());
             System.out.println("Received alice's public key");
 
+            Thread sender = senderThread();
+            Thread reciever = recieverThread();
+
+            sender.start();
+            reciever.start();
+        
         } catch (Exception e){
             System.out.println("Failed to send Certificate.");
             e.printStackTrace();
-            System.exit(0);
         }
-
-
-        Thread sender = senderThread();
-        Thread reciever = recieverThread();
-
-        sender.start();
-        reciever.start();
 
 
     }
 
+    private byte[] encryptMessage(String message) throws Exception{
 
-    private void sendMessage(String message) throws IOException{
-        sendBytes(message.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = crypto.generateSecretKey();
+        IvParameterSpec iv = crypto.generateInitialisationVector();
+
+        byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+        byte[] encryptedKey = crypto.encryptSecretKey(key);
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
+        outputStream.write( encryptedKey );
+        outputStream.write(iv.getIV());
+        outputStream.write( encryptedMessage );
+
+        return outputStream.toByteArray();
+
+    }
+
+    private byte[] decryptMessage(byte[] data) throws Exception{
+
+        SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
+        IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
+        byte[] decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
+        return decryptedMessage;
+
+
     }
 
     private void sendBytes(String message) throws IOException{
 
-        // Encryption here on byte array?
         byte[] bytes = message.getBytes();
 
-        output.writeInt(bytes.length);
         if (bytes.length>0){
             output.write(bytes);
         }
-
+        output.flush();
     }
 
-    private byte[] recieveBytes() throws IOException{
 
-//        Decryption here
 
-        int length = input.readInt();
-        byte[] bytes = new byte[length];
+    private byte[] receiveBytes() throws IOException {
 
-        if (length> 0){
-            input.readFully(bytes);
+        byte[] buffer = new byte[1024];
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+
+        while (true) {
+            int count = input.read(buffer);
+            bos.write(buffer,0,count);
+            if (input.available() == 0){
+                break;
+            }
+
         }
 
-        return bytes;
+        return bos.toByteArray();
     }
-
 
     private void sendBytes(byte[] bytes) throws IOException{
 
         // Encryption here on byte array?
 
-        output.writeInt(bytes.length);
+
         if (bytes.length>0){
             output.write(bytes);
         }
-
+        output.flush();
     }
 
 //    public void sendFile(String filename, String caption) throws IOException{
