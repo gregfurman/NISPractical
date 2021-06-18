@@ -188,7 +188,13 @@ public class Cryptography {
         return hash;
     }
 
-
+    public static String byteHex(byte[] data){
+        StringBuffer hexString = new StringBuffer();
+        for (int i = 0;i<data.length;i++) {
+            hexString.append(Integer.toHexString(0xFF & data[i]));
+        }
+        return hexString.toString();
+    }
 
 
 
