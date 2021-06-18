@@ -6,8 +6,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.zip.GZIPInputStream;
 
 public class Server{
 
@@ -75,15 +77,19 @@ public class Server{
                     while ((byteArray = receiveBytes()) != null) {
                         // Decryption!!
 
-                        System.out.println(new String(byteArray));
+                        System.out.println(new String(decryptMessage(byteArray)));
                     }
 
 
                     serverSocket.close();
                     clientSocket.close();
 
+                    System.exit(0);
+
                 } catch (IOException e){
                     System.out.println("Client disconnected.");
+                } catch (Exception e){
+                    System.out.println("Fatal error: decryption failed.");
                 }
 
             }
@@ -110,13 +116,14 @@ public class Server{
                     // If a user inputs "quit", the loop terminates.
                     while (!(message = keyboardInput.readLine()).equals("quit")) {
 
-                        encryptMessage(message);
+                        sendBytes(encryptMessage(message));
                     }
 
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
 
+                System.exit(0);
             }
         });
 
@@ -128,23 +135,20 @@ public class Server{
      */
     public void start(){
 
-        // Diffie hellman?
         try {
             sendBytes(crypto.getPublicKey().getEncoded());
             crypto.setKUb(receiveBytes());
 
+            Thread sender = senderThread();
+            Thread receiver = receiverThread();
+
+            sender.start();
+            receiver.start();
+
         } catch (Exception e){
             System.out.println("Failed to send public key.");
             e.printStackTrace();
-            System.exit(0);
         }
-
-        Thread sender = senderThread();
-        Thread receiver = receiverThread();
-
-        sender.start();
-        receiver.start();
-
 
     }
 
@@ -153,26 +157,21 @@ public class Server{
      * initialisation vector. The resulting message, key, and IV are sent as bytes to the client.
      * @param message String message to encrypted and sent to client.
      */
-    private void encryptMessage(String message){
+    private byte[] encryptMessage(String message) throws Exception{
 
-        try {
-            SecretKey key = crypto.generateSecretKey();
-            IvParameterSpec iv = crypto.generateInitialisationVector();
+        SecretKey key = crypto.generateSecretKey();
+        IvParameterSpec iv = crypto.generateInitialisationVector();
 
-            byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
-            byte[] encryptedKey = crypto.encryptSecretKey(key);
+        byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+        byte[] encryptedKey = crypto.encryptSecretKey(key);
 
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-            outputStream.write( encryptedKey );
-            outputStream.write(iv.getIV());
-            outputStream.write( encryptedMessage );
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
+        outputStream.write( encryptedKey );
+        outputStream.write(iv.getIV());
+        outputStream.write( encryptedMessage );
 
-            sendBytes(outputStream.toByteArray());
+        return outputStream.toByteArray();
 
-
-        } catch (Exception e){
-            e.printStackTrace();
-        }
     }
 
     /**
@@ -180,36 +179,34 @@ public class Server{
      * @param data
      * @return byte array of decrypted message.
      */
-    private byte[] decryptMessage(byte[] data){
+    private byte[] decryptMessage(byte[] data) throws Exception{
 
-        byte[] decryptedMessage = {};
-        try {
-
-            SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
-            IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
-            decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
-            return decryptedMessage;
-
-
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-
+        SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
+        IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
+        byte[] decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
         return decryptedMessage;
+
     }
 
     private byte[] receiveBytes() throws IOException {
 
-//        Decryption here
+        byte[] buffer = new byte[1024];
 
-        int length = input.readInt();
-        byte[] bytes = new byte[length];
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
 
-        if (length> 0){
-            input.readFully(bytes);
+
+        while (true) {
+            int count = input.read(buffer);
+            bos.write(buffer,0,count);
+            if (input.available() == 0){
+                break;
+            }
+
         }
 
-        return bytes;
+        bos.flush();
+
+        return bos.toByteArray();
     }
 
 
@@ -218,18 +215,28 @@ public class Server{
      * @param bytes
      * @throws IOException
      */
+//    private void sendBytes(byte[] bytes) throws IOException{
+//
+//        // Encryption here on byte array?
+//
+//
+//
+//        output.writeInt(bytes.length);
+//        if (bytes.length>0){
+//            output.write(bytes);
+//        }
+//
+//    }
+
     private void sendBytes(byte[] bytes) throws IOException{
 
         // Encryption here on byte array?
 
 
-
-        output.writeInt(bytes.length);
         if (bytes.length>0){
             output.write(bytes);
         }
-
+        output.flush();
     }
-
 
 }
