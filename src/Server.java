@@ -1,5 +1,6 @@
 import javax.crypto.CipherOutputStream;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,6 +10,7 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 
 public class Server{
 
@@ -83,13 +85,13 @@ public class Server{
                     serverSocket.close();
                     clientSocket.close();
 
-                    System.exit(0);
 
                 } catch (IOException e){
                     System.out.println("Client disconnected.");
                 } catch (Exception e){
                     System.out.println("Fatal error: decryption failed.");
                 }
+                System.exit(0);
 
             }
         });
@@ -135,13 +137,14 @@ public class Server{
     public void start(){
 
         try {
+
             //Creates a certificate and sends it to client
             X509Certificate myID = CA.createCertificate("CN=Alice, C=CapeTown, C=ZA", crypto.getPublicKey());
             System.out.println("Sending Bob my certificate (I'm Alice) ");
             sendBytes(myID.getEncoded());
 
             // Received bytes from client and converts it to a certificate
-            byte [] senderCertificate = recieveBytes();
+            byte [] senderCertificate = receiveBytes();
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             ByteArrayInputStream bobCertificate = new ByteArrayInputStream(senderCertificate);
             Certificate certificate = cf.generateCertificate(bobCertificate);
@@ -156,17 +159,17 @@ public class Server{
             crypto.setKUb(certificate.getPublicKey().getEncoded());
             System.out.println("Received bob's public key");
             
-            Thread sender = senderThread();
-            Thread receiver = receiverThread();
 
-            sender.start();
-            receiver.start();
 
         } catch (Exception e){
             System.out.println("Failed to send Certificate.");
             e.printStackTrace();
         }
+        Thread sender = senderThread();
+        Thread receiver = receiverThread();
 
+        sender.start();
+        receiver.start();
     }
 
     /**

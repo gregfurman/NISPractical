@@ -1,4 +1,6 @@
 import javax.crypto.CipherInputStream;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -7,6 +9,7 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 
 
 public class Client {
@@ -75,6 +78,7 @@ public class Client {
                     System.out.println("Fatal error: decryption failed.");
                 }
 
+                System.exit(0);
             }
         });
     }
@@ -108,13 +112,14 @@ public class Client {
     public void start(){
 
         try {
+
             //Creates a certificate and sends it to server
             X509Certificate myID = CA.createCertificate("CN=BOB, C=CapeTown, C=ZA", crypto.getPublicKey());
             System.out.println("Sending Alice my certificate (I'm Bob) ");
             sendBytes(myID.getEncoded());
 
             // Received bytes from server and converts it to a certificate
-            byte [] senderCertificate = recieveBytes();
+            byte [] senderCertificate = receiveBytes();
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
             Certificate certificate = cf.generateCertificate(aliceCertificate);
@@ -129,16 +134,18 @@ public class Client {
             crypto.setKUb(certificate.getPublicKey().getEncoded());
             System.out.println("Received alice's public key");
 
-            Thread sender = senderThread();
-            Thread reciever = recieverThread();
 
-            sender.start();
-            reciever.start();
         
         } catch (Exception e){
             System.out.println("Failed to send Certificate.");
             e.printStackTrace();
         }
+
+        Thread sender = senderThread();
+        Thread receiver = receiverThread();
+
+        sender.start();
+        receiver.start();
 
 
     }
