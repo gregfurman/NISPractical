@@ -22,6 +22,8 @@ public class Cryptography {
     private CertificateAuthority CA;
 
     private PublicKey KUb;
+    private File file;
+    private String recieved_hash;
 
     public Cryptography() throws NoSuchAlgorithmException{
         CA = new CertificateAuthority();
@@ -168,7 +170,8 @@ public class Cryptography {
         return H;
     }
 
-    public static byte[] sha512File(File file) throws Exception{
+    public byte[] sha512File(File file) throws Exception{
+
         MessageDigest digest = MessageDigest.getInstance("SHA-512");
         digest.reset();
         byte[] hash = new byte[0];
@@ -188,7 +191,7 @@ public class Cryptography {
         return hash;
     }
 
-    public static String byteHex(byte[] data){
+    public String byteHex(byte[] data){
         StringBuffer hexString = new StringBuffer();
         for (int i = 0;i<data.length;i++) {
             hexString.append(Integer.toHexString(0xFF & data[i]));
@@ -196,7 +199,10 @@ public class Cryptography {
         return hexString.toString();
     }
 
-
+    public boolean checkHash(File file, String received_hash) throws Exception {
+        String new_hash = byteHex(sha512File(file));
+        return received_hash.equals(new_hash);
+    }
 
     public String decompress(byte[] M) throws IOException{
 
