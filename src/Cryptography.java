@@ -168,6 +168,27 @@ public class Cryptography {
         return H;
     }
 
+    public static byte[] sha512File(File file) throws Exception{
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        digest.reset();
+        byte[] hash = new byte[0];
+        try{
+            BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+            DigestInputStream dis = new DigestInputStream(bis,digest);
+            while (dis.read() != -1) {
+            }
+            dis.close();
+            hash = digest.digest();
+
+        }
+
+        catch(Exception e){
+            System.out.println("oops");
+        }
+        return hash;
+    }
+
+
 
 
 
