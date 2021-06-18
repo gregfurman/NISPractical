@@ -3,6 +3,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.zip.GZIPOutputStream;
 
 
 public class Client {
@@ -47,6 +48,7 @@ public class Client {
         output = new DataOutputStream(clientSocket.getOutputStream());
         input = new DataInputStream(clientSocket.getInputStream());
 
+
         keyboardInput = new BufferedReader(new InputStreamReader(System.in));
 
     }
@@ -90,11 +92,22 @@ public class Client {
 
                 try {
                     String message;
+                    System.out.println("Welcome\nPlease enter 1 (to send a message) or 2 (to send a file)");
+                    String cmd = keyboardInput.readLine();
+                    if (cmd.equals("1")){
+                        while (!(message = keyboardInput.readLine()).equals("quit")) {
+                            // Encrpytion!!
+                            sendBytes(message);
 
-                    while (!(message = keyboardInput.readLine()).equals("quit")) {
-                        // Encrpytion!!
-                        sendBytes(message);
+                    }}
+                    else if (cmd.equals("2")){
+                        System.out.println("Enter file name:\n");
+                        String fileName = keyboardInput.readLine();
+                        while (!(keyboardInput.readLine()).equals("quit")) {
+                            // Encrpytion!!
+                            sendFile(fileName);
 
+                        }
                     }
 
                 } catch (Exception e) {
@@ -125,7 +138,7 @@ public class Client {
         Thread reciever = recieverThread();
 
         sender.start();
-        reciever.start();
+        //reciever.start();
 
 
     }
@@ -139,11 +152,36 @@ public class Client {
 
         // Encryption here on byte array?
         byte[] bytes = message.getBytes();
-
-        output.writeInt(bytes.length);
+        GZIPOutputStream compressed = new GZIPOutputStream(output);
+        output.writeInt(1);
+        compressed.write(bytes.length);
         if (bytes.length>0){
-            output.write(bytes);
+            compressed.write(bytes);
         }
+        compressed.flush();
+        output.close();
+
+
+    }
+
+    private void sendFile(String fileName) throws IOException{
+
+        // Encryption here on byte array?
+        File file = new File(fileName);
+
+        byte[] bytes = new byte[BUFFERSIZE];
+        //FileOutputStream fos = new FileOutputStream(fileName + ".gz");
+        //GZIPOutputStream compressed = new GZIPOutputStream(fos);
+        InputStream in = new FileInputStream(file);
+
+        int count;
+        output.writeInt(2);
+        output.write(fileName.getBytes());
+        //compressed.write(bytes.length);
+        while ((count = in.read(bytes)) > 0){
+            output.write(bytes, 0, count);
+        }
+       // compressed.finish();
 
     }
 

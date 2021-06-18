@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class Server{
 
@@ -61,12 +63,23 @@ public class Server{
             @Override
             public void run() {
                 try {
-                    byte[] byteArray;
-                    while ((byteArray = recieveBytes()) != null) {
+                    byte[] byteArray = new byte[BUFFERSIZE];
                         // Decryption!!
 
-                        System.out.println(new String(byteArray));
-                    }
+                        try{
+                            int msgOrFile = input.readInt();
+                            if (msgOrFile==1){
+                                byteArray = recieveBytes();
+                                System.out.println(new String(byteArray));
+                            }
+                            else if (msgOrFile==2){
+                                receiveFile();
+                            }
+
+                        } catch (Exception e){
+                            System.out.println(e.getMessage());
+                        }
+
 
 
                     serverSocket.close();
@@ -156,14 +169,30 @@ public class Server{
 
 //        Decryption here
 
-        int length = input.readInt();
-        byte[] bytes = new byte[length];
+        byte[] bytes = new byte[BUFFERSIZE];
+        GZIPInputStream decompressed = new GZIPInputStream(input);
 
-        if (length> 0){
-            input.readFully(bytes);
+        int count;
+        if ((count = decompressed.read(bytes)) > 0){
+            decompressed.read(bytes, 0, bytes.length);
         }
 
         return bytes;
+    }
+
+
+    private void receiveFile() throws IOException {
+
+//        Decryption her
+
+        byte[] bytes = new byte[BUFFERSIZE];
+        //GZIPInputStream decompressed = new GZIPInputStream(input);
+        FileOutputStream fos = new FileOutputStream("transFile.txt");
+        int count;
+        if ((count = input.read(bytes)) > 0){
+            fos.write(bytes, 0, bytes.length);
+        }
+
     }
 
 
@@ -217,6 +246,7 @@ public class Server{
         fileReader.close();
         cipherOutputStream.close();
     }
+
 
 
 
