@@ -55,12 +55,14 @@ public class Cryptography {
 
     }
 
-    public byte[] encryptWithSecretKey(String message, SecretKey secretKey, IvParameterSpec iv) throws Exception{
+    public byte[] encryptWithSecretKey(byte[] data, SecretKey secretKey, IvParameterSpec iv) throws Exception{
+
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
 
-        return cipher.doFinal(message.getBytes());
+        return cipher.doFinal(Base64.getEncoder().encode(data));
+
 
     }
 
@@ -90,7 +92,7 @@ public class Cryptography {
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, secretKey,iv);
-        return cipher.doFinal(data);
+        return Base64.getDecoder().decode(cipher.doFinal(data));
 
     }
 
@@ -169,29 +171,6 @@ public class Cryptography {
     }
 
 
-
-
-    public String decompress(byte[] M) throws IOException{
-
-        if (M.length == 0) {
-            return "";
-        }
-
-        GZIPInputStream zipStream = new GZIPInputStream(new ByteArrayInputStream(M));
-        BufferedReader bf = new BufferedReader(new InputStreamReader(zipStream, "UTF-8"));
-
-        String line;
-        StringBuilder sb = new StringBuilder();
-
-        while ((line=bf.readLine())!=null) {
-            sb.append(line);
-        }
-
-
-        return sb.toString();
-
-
-    }
 
 
     public CipherOutputStream cipherOut( OutputStream out) throws Exception{
