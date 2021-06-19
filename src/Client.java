@@ -10,6 +10,11 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterOutputStream;
 
 
 public class Client {
@@ -74,8 +79,11 @@ public class Client {
 
                 } catch (IOException e) {
                     System.out.println("Client disconnected.");
+                    e.printStackTrace();
+
                 } catch (Exception e) {
                     System.out.println("Fatal error: decryption failed.");
+                    e.printStackTrace();
                 }
 
                 System.exit(0);
@@ -150,12 +158,17 @@ public class Client {
 
     }
 
+    /**
+     * Method to encrypt a string message using AES ecnryption with an ephemeral session key and
+     * initialisation vector. The resulting message, key, and IV are sent as bytes to the client.
+     * @param message String message to encrypted and sent to client.
+     */
     private byte[] encryptMessage(String message) throws Exception{
 
         SecretKey key = crypto.generateSecretKey();
         IvParameterSpec iv = crypto.generateInitialisationVector();
 
-        byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+        byte[] encryptedMessage = crypto.encryptWithSecretKey(compress(message.getBytes()), key,iv); // Here is where compression takes place.
         byte[] encryptedKey = crypto.encryptSecretKey(key);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
@@ -167,13 +180,15 @@ public class Client {
 
     }
 
+
+
     private byte[] decryptMessage(byte[] data) throws Exception{
 
         SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
-        IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
-        byte[] decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
-        return decryptedMessage;
+        IvParameterSpec iv = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
 
+        byte[] decryptedMessage = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,iv)); // decompression
+        return decryptedMessage;
 
     }
 
@@ -188,6 +203,39 @@ public class Client {
     }
 
 
+    private byte[] compress(byte[] data) throws IOException{
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+
+        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION,true);
+
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos,deflater);
+
+        dos.write(data);
+
+        dos.close();
+
+        return bos.toByteArray();
+
+    }
+
+
+    private byte[] decompress(byte[] data) throws IOException{
+
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+        Inflater inflater = new Inflater(true);
+
+        InflaterOutputStream ios = new InflaterOutputStream(bos,inflater);
+
+        ios.write(data);
+        ios.close();
+
+        return bos.toByteArray();
+
+    }
 
     private byte[] receiveBytes() throws IOException {
 
@@ -209,9 +257,6 @@ public class Client {
     }
 
     private void sendBytes(byte[] bytes) throws IOException{
-
-        // Encryption here on byte array?
-
 
         if (bytes.length>0){
             output.write(bytes);

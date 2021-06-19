@@ -11,6 +11,11 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterOutputStream;
 
 public class Server{
 
@@ -89,6 +94,7 @@ public class Server{
                 } catch (IOException e){
                     System.out.println("Client disconnected.");
                 } catch (Exception e){
+                    e.printStackTrace();
                     System.out.println("Fatal error: decryption failed.");
                 }
                 System.exit(0);
@@ -182,7 +188,7 @@ public class Server{
         SecretKey key = crypto.generateSecretKey();
         IvParameterSpec iv = crypto.generateInitialisationVector();
 
-        byte[] encryptedMessage = crypto.encryptWithSecretKey(message, key,iv);
+        byte[] encryptedMessage = crypto.encryptWithSecretKey(compress(message.getBytes()), key,iv); // Here is where compression takes place.
         byte[] encryptedKey = crypto.encryptSecretKey(key);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
@@ -194,6 +200,8 @@ public class Server{
 
     }
 
+
+
     /**
      * Decrypts a byte array that contains an AES session key, an initialisation vector, and some message or data.
      * @param data
@@ -203,12 +211,46 @@ public class Server{
 
         SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
         IvParameterSpec IV = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
-        byte[] decryptedMessage = crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV);
+        byte[] decryptedMessage = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,IV)); // decompression
         return decryptedMessage;
 
     }
 
-    private byte[] receiveBytes() throws IOException {
+    private byte[] compress(byte[] data) throws IOException{
+
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+
+        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION,true);
+
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos,deflater);
+
+        dos.write(data);
+
+        dos.close();
+
+        return bos.toByteArray();
+
+    }
+
+    private byte[] decompress(byte[] data) throws IOException{
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+        Inflater inflater = new Inflater(true);
+
+        InflaterOutputStream ios = new InflaterOutputStream(bos,inflater);
+
+        ios.write(data);
+        ios.close();
+
+        return bos.toByteArray();
+
+    }
+
+
+        private byte[] receiveBytes() throws IOException {
 
         byte[] buffer = new byte[1024];
 
@@ -249,9 +291,6 @@ public class Server{
 //    }
 
     private void sendBytes(byte[] bytes) throws IOException{
-
-        // Encryption here on byte array?
-
 
         if (bytes.length>0){
             output.write(bytes);
