@@ -1,4 +1,3 @@
-import javax.crypto.CipherInputStream;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
@@ -6,7 +5,6 @@ import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
@@ -208,8 +206,6 @@ public class Client {
         // Message
         ByteArrayOutputStream Message = new ByteArrayOutputStream();
         Message.write(message.getBytes());
-        // add in file !
-        // caption jazz as well !
 
         // Adding message byte array to end of signature for compression
         Signature.write(Message.toByteArray());
@@ -244,43 +240,71 @@ public class Client {
 
         byte[] data = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(decodedData,566,decodedData.length),key,iv));
 
-        Date timestamp = new Date(new BigInteger(Arrays.copyOfRange(data,0,32)).intValue());
+        int bytesRead = 0;
+
+        Date timestamp = new Date(new BigInteger(Arrays.copyOfRange(data,bytesRead, bytesRead+4)).intValue());
+        bytesRead+= 4;
         Date now = new Date();
         long SecondsToArrive= ((now.getTime()- timestamp.getTime() )/1000)%60;
+        System.out.println(now.toString() + " " + timestamp.toString());
 
+        // If takes longer than 60 seconds timeout
         if (SecondsToArrive > 60)
             throw new Exception(String.format("Time to live of message has expired: took %d seconds.",SecondsToArrive));
 
-        // TTL ?
-        byte[] senderPublicKey = Arrays.copyOfRange(data,32,326);
+        // Get public key of sender
+        byte[] senderPublicKey = Arrays.copyOfRange(data,bytesRead,bytesRead + 294);
         if (!crypto.isSendersPublicKey(senderPublicKey))
             throw new Exception("Sender ID is incorrect.");
+        bytesRead+=294; // length of public key object encoding
 
-        byte[] octets = Arrays.copyOfRange(data,326,328); // ???
+        // No idea what to do with the octets but it's in the PGP message sooooo
+        byte[] octets = Arrays.copyOfRange(data,bytesRead,bytesRead+2); // ???
+        bytesRead+=2;
 
-        byte[] messageDigest = crypto.PublicKeyDecryptB(Arrays.copyOfRange(data,328,584));
+        byte[] messageDigest = crypto.PublicKeyDecryptB(Arrays.copyOfRange(data,bytesRead,bytesRead+256));
+        bytesRead+=256;
+//        System.out.println(new String(messageDigest,"UTF-8"));
 
-        // Message Decrypt!
+         // Entire message
+        System.out.println("start");
+        if (!crypto.checkHash(Arrays.copyOfRange(data,bytesRead,data.length),messageDigest))
+            throw new Exception("Integrity or authority violation: Message digest error.");
+        System.out.println("end");
 
-        boolean isFile =  data[583] == 1;
+        System.out.println(bytesRead);
+        boolean isFile =  data[bytesRead] == 1; //584
+        bytesRead += 1;
+
         byte[] message;
-        if (true) {
-            int captionLength = new BigInteger(Arrays.copyOfRange(data,584,588)).intValue();
-            String caption = new String(Arrays.copyOfRange(data,588,captionLength+588), "UTF-8");
-            int fileNameLength = new BigInteger(Arrays.copyOfRange(data,588+captionLength,596+captionLength)).intValue();
-            String filename =  new String(Arrays.copyOfRange(data,596+captionLength,596+captionLength+fileNameLength), "UTF-8");
+        if (isFile) {
 
-            long fileLength = ByteBuffer.wrap(Arrays.copyOfRange(data,596+captionLength+fileNameLength,596+captionLength+fileNameLength+8)).getLong();
-            message = Arrays.copyOfRange(data, 596+captionLength+fileNameLength+8, data.length);
-            if (!crypto.checkHash(message,messageDigest))
-                throw new Exception("Integrity or authority violation: Message digest error.");
-//            System.out.println(caption);
-            FileOutputStream fout = new FileOutputStream("test_"+filename);
-            fout.write(message);
+            // Length of caption string in byte form to allow for reading from data
+            int captionLength = new BigInteger(Arrays.copyOfRange(data,bytesRead,bytesRead+4)).intValue();
+            bytesRead+=4;
+
+            message = Arrays.copyOfRange(data,bytesRead,captionLength+bytesRead);
+            bytesRead+=captionLength;
+
+            // Length of filename string in byte form to allow for reading from data
+            int fileNameLength = new BigInteger(Arrays.copyOfRange(data,bytesRead,bytesRead+4)).intValue();
+            bytesRead+=4;
+
+            String filename =  new String(Arrays.copyOfRange(data,bytesRead,bytesRead+fileNameLength), "UTF-8");
+
+            // Length of file used to read bytes that correspond to file
+            int fileLength =  (int)ByteBuffer.wrap(Arrays.copyOfRange(data,bytesRead,bytesRead+8)).getLong();
+            bytesRead+=8;
+
+            byte[] file = Arrays.copyOfRange(data, bytesRead, bytesRead+fileLength);
+
+
+            FileOutputStream fout = new FileOutputStream(filename);
+            fout.write(file);
             fout.close();
 
         } else{
-            message = Arrays.copyOfRange(data,584,data.length);
+            message = Arrays.copyOfRange(data,bytesRead,data.length);
             if (!crypto.checkHash(message,messageDigest))
                 throw new Exception("Integrity or authority violation: Message digest error.");
         }
@@ -288,21 +312,10 @@ public class Client {
         return message;
     }
 
-    private void sendBytes(String message) throws IOException{
-
-        byte[] bytes = message.getBytes();
-
-        if (bytes.length>0){
-            output.write(bytes);
-        }
-        output.flush();
-    }
-
 
     private byte[] compress(byte[] data) throws IOException{
 
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-
 
         Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION,true);
 
@@ -365,50 +378,5 @@ public class Client {
         }
         output.flush();
     }
-
-//    public void sendFile(String filename, String caption) throws IOException{
-//
-//
-//        File file = new File(filename);
-//
-//        InputStream inputStream = new FileInputStream(file);
-//        OutputStream outputStream = clientSocket.getOutputStream();
-//
-//        byte[] buffer = new byte[BUFFERSIZE];
-//        int readBytes;
-//
-//        while ( (readBytes = inputStream.read(buffer)) > 0){
-//
-//            outputStream.write(buffer,0,readBytes);
-//        }
-//
-//        outputStream.close();
-//        inputStream.close();
-//
-//
-//    }
-
-    public void receievFile() throws Exception{
-
-
-        CipherInputStream cipherIn = crypto.cipherInput(clientSocket.getInputStream());
-        System.out.println(clientSocket.getInputStream());
-
-        byte[] buffer = new byte[256];
-        FileOutputStream fileWriter = new FileOutputStream("test.pdf");
-        int readBytes;
-        System.out.println(cipherIn.available());
-        while((readBytes = cipherIn.read(buffer)) > 0){
-            System.out.println(readBytes);
-            fileWriter.write(buffer,0,readBytes);
-        }
-
-        fileWriter.flush();
-        fileWriter.close();
-    }
-
-
-
-
 
 }

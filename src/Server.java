@@ -1,4 +1,3 @@
-import javax.crypto.CipherOutputStream;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
@@ -6,7 +5,6 @@ import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
@@ -230,12 +228,10 @@ public class Server{
 
         // Message
         ByteArrayOutputStream Message = new ByteArrayOutputStream();
+
+        // Set to 0 to indicate message NOT file being sent
+        Message.write(0);
         Message.write(message.getBytes());
-        //filename
-        //file size
-        // file data
-        // add in file !
-        // caption jazz as well !
 
         // Adding message byte array to end of signature for compression
         Signature.write(Message.toByteArray());
@@ -277,14 +273,12 @@ public class Server{
         SessionKeyComponent.write(iv.getIV());
         System.out.println("IV length: "+iv.getIV().length);
 
-
-
         // Signature
         ByteArrayOutputStream Signature = new ByteArrayOutputStream();
 
         // converting hash of datetime to 32 byte array
         Date today = new Date();
-        byte[] timeStamp =  ByteBuffer.allocate(32).putInt(new Date(today.getTime() + 100).hashCode()).array();
+        byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
         Signature.write(timeStamp);
 
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
@@ -296,33 +290,46 @@ public class Server{
         if (!file.exists())
             throw new Exception("Error: file does not exist.");
 
-        byte[] FileAsBytes = Files.readAllBytes(file.toPath());
-
-        byte[] messageDigest = crypto.privateKeyEncrypt(crypto.sha512(FileAsBytes));
-        System.out.println("Message digest length: " +messageDigest.length);
-        byte[] leadingOctets =  Arrays.copyOfRange(messageDigest,0,2);
-        Signature.write(leadingOctets);
-
-        Signature.write(messageDigest);
-
-        byte[] captionBytes = caption.getBytes();
-        byte[] filenameBytes = filename.getBytes();
-        // Message
         ByteArrayOutputStream Message = new ByteArrayOutputStream();
 
+        // Message
+
         // byte array of 1 indicating file
-        Message.write(new byte[]{1});
+        Message.write(1);
+
+        // File caption
+        byte[] captionBytes = caption.getBytes();
         Message.write(ByteBuffer.allocate(4).putInt(captionBytes.length).array());
         Message.write(captionBytes);
 
 
         // Filename
+        byte[] filenameBytes = filename.getBytes();
         Message.write(ByteBuffer.allocate(4).putInt(filenameBytes.length).array());
-        Message.write(filenameBytes);
+
+        FileInputStream fis = new FileInputStream(file);
+        int count=0;
+        long fileLength = file.length();
+        byte[] buffer = new byte[1024];
+        while( (count = fis.read(buffer)) > 0) {
+            Message.write(buffer, 0, count);
+            fileLength+=count;
+        }
 
         // Read in length of file
-        Message.write(ByteBuffer.allocate(8).putLong(file.length()).array());
-        Message.write(FileAsBytes);
+//        Message.write(FileAsBytes);
+        Message.write(ByteBuffer.allocate(8).putLong(fileLength).array());
+
+        System.out.println("Length of file is " + fileLength);
+
+        // Calculating message digest
+        byte[] messageDigest = crypto.privateKeyEncrypt(crypto.sha512(Message.toByteArray()));
+
+        System.out.println("Message digest length: " +messageDigest.length);
+        byte[] leadingOctets =  Arrays.copyOfRange(messageDigest,0,2);
+
+        Signature.write(leadingOctets);
+        Signature.write(messageDigest);
 
         // Adding message byte array to end of signature for compression
         Signature.write(Message.toByteArray());
@@ -333,6 +340,7 @@ public class Server{
         PGPMessage.write(SessionKeyComponent.toByteArray());
         PGPMessage.write(compressedAndEncryptedMessage);
 
+        PGPMessage.close();
 
         return Base64.getEncoder().encode(PGPMessage.toByteArray());
 
