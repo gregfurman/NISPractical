@@ -3,6 +3,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.*;
+
 import sun.security.x509.*;
 import java.security.cert.*;
 import java.security.cert.Certificate;
@@ -121,6 +122,7 @@ public class CA {
         CertificateAuthority CA = new CertificateAuthority();
         PrivateKey privateKey = CA.getPrivate();
         PublicKey publicKey = CA.getPublic();
+
 
         //Creates a keystore object to save the Private key and self signed certificate of the Authority
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());

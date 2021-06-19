@@ -2,7 +2,10 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
+import java.lang.reflect.Array;
+import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
@@ -11,6 +14,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Date;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
@@ -163,33 +167,125 @@ public class Client {
      * initialisation vector. The resulting message, key, and IV are sent as bytes to the client.
      * @param message String message to encrypted and sent to client.
      */
-    private byte[] encryptMessage(String message) throws Exception{
+    private byte[] encryptMessage(String message) throws Exception {
+
+        // Session key component
+        ByteArrayOutputStream SessionKeyComponent = new ByteArrayOutputStream();
+
+        byte[] recipientPublicKey = crypto.getReceipientKey().getEncoded();
+        System.out.println("Public key object length: " + recipientPublicKey.length);
+        SessionKeyComponent.write(recipientPublicKey);
 
         SecretKey key = crypto.generateSecretKey();
-        IvParameterSpec iv = crypto.generateInitialisationVector();
-
-        byte[] encryptedMessage = crypto.encryptWithSecretKey(compress(message.getBytes()), key,iv); // Here is where compression takes place.
         byte[] encryptedKey = crypto.encryptSecretKey(key);
+        SessionKeyComponent.write(encryptedKey);
+        System.out.println("Session key length: " + encryptedKey.length);
 
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-        outputStream.write( encryptedKey );
-        outputStream.write(iv.getIV());
-        outputStream.write( encryptedMessage );
+        // adding init vector - maybe encrypt?
+        IvParameterSpec iv = crypto.generateInitialisationVector();
+        SessionKeyComponent.write(iv.getIV());
+        System.out.println("IV length: " + iv.getIV().length);
 
-        return outputStream.toByteArray();
+
+        // Signature
+        ByteArrayOutputStream Signature = new ByteArrayOutputStream();
+
+        // converting hash of datetime to 32 byte array
+        Date today = new Date();
+        byte[] timeStamp = ByteBuffer.allocate(32).putInt(new Date(today.getTime() + 100).hashCode()).array();
+        Signature.write(timeStamp);
+
+        byte[] myPublicKey = crypto.getPublicKey().getEncoded();
+        Signature.write(myPublicKey);
+
+        byte[] messageDigest = crypto.privateKeyEncrypt(crypto.sha512(message.getBytes()));
+        System.out.println("Message digest length: " + messageDigest.length);
+        byte[] leadingOctets = Arrays.copyOfRange(messageDigest, 0, 2);
+        Signature.write(leadingOctets);
+
+        Signature.write(messageDigest);
+
+        // Message
+        ByteArrayOutputStream Message = new ByteArrayOutputStream();
+        Message.write(message.getBytes());
+        // add in file !
+        // caption jazz as well !
+
+        // Adding message byte array to end of signature for compression
+        Signature.write(Message.toByteArray());
+
+        byte[] compressedAndEncryptedMessage = crypto.encryptWithSecretKey(compress(Signature.toByteArray()), key, iv); // Here is where compression takes place.
+
+        ByteArrayOutputStream PGPMessage = new ByteArrayOutputStream();
+        PGPMessage.write(SessionKeyComponent.toByteArray());
+        PGPMessage.write(compressedAndEncryptedMessage);
+
+
+        return Base64.getEncoder().encode(PGPMessage.toByteArray());
+
 
     }
 
+    private byte[] decryptMessage(byte[] rawMessageData) throws Exception{
 
+        byte[] decodedData = Base64.getDecoder().decode(rawMessageData);
+        // Length of byte array of public key object in java is 294 bytes. Go figure.
 
-    private byte[] decryptMessage(byte[] data) throws Exception{
+        // Session component
+        byte[] publicKey = Arrays.copyOfRange(decodedData,0,294);
 
-        SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(data,0,256));
-        IvParameterSpec iv = new IvParameterSpec(Arrays.copyOfRange(data,256,256+16));
+        if (!crypto.isPublicKey(publicKey))
+            throw new Exception("Destination ID is incorrect.");
 
-        byte[] decryptedMessage = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(data,256+16,data.length),key,iv)); // decompression
-        return decryptedMessage;
+        SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(decodedData,294,550));
+        IvParameterSpec iv = new IvParameterSpec(Arrays.copyOfRange(decodedData,550,566)); // Maybe decrypt?
 
+        // Signature
+
+        byte[] data = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(decodedData,566,decodedData.length),key,iv));
+
+        Date timestamp = new Date(new BigInteger(Arrays.copyOfRange(data,0,32)).intValue());
+        Date now = new Date();
+        long SecondsToArrive= ((now.getTime()- timestamp.getTime() )/1000)%60;
+
+        if (SecondsToArrive > 60)
+            throw new Exception(String.format("Time to live of message has expired: took %d seconds.",SecondsToArrive));
+
+        // TTL ?
+        byte[] senderPublicKey = Arrays.copyOfRange(data,32,326);
+        if (!crypto.isSendersPublicKey(senderPublicKey))
+            throw new Exception("Sender ID is incorrect.");
+
+        byte[] octets = Arrays.copyOfRange(data,326,328); // ???
+
+        byte[] messageDigest = crypto.PublicKeyDecryptB(Arrays.copyOfRange(data,328,584));
+
+        // Message Decrypt!
+
+        boolean isFile =  data[583] == 1;
+        byte[] message;
+        if (true) {
+            int captionLength = new BigInteger(Arrays.copyOfRange(data,584,588)).intValue();
+            String caption = new String(Arrays.copyOfRange(data,588,captionLength+588), "UTF-8");
+            int fileNameLength = new BigInteger(Arrays.copyOfRange(data,588+captionLength,596+captionLength)).intValue();
+            String filename =  new String(Arrays.copyOfRange(data,596+captionLength,596+captionLength+fileNameLength), "UTF-8");
+
+            long fileLength = ByteBuffer.wrap(Arrays.copyOfRange(data,596+captionLength+fileNameLength,596+captionLength+fileNameLength+8)).getLong();
+            message = Arrays.copyOfRange(data, 596+captionLength+fileNameLength+8, data.length);
+            if (!crypto.checkHash(message,messageDigest))
+                throw new Exception("Integrity or authority violation: Message digest error.");
+//            System.out.println(caption);
+            FileOutputStream fout = new FileOutputStream("test_"+filename);
+            fout.write(message);
+            fout.close();
+
+        } else{
+            message = Arrays.copyOfRange(data,584,data.length);
+            if (!crypto.checkHash(message,messageDigest))
+                throw new Exception("Integrity or authority violation: Message digest error.");
+        }
+
+        return message;
     }
 
     private void sendBytes(String message) throws IOException{
@@ -256,10 +352,16 @@ public class Client {
         return bos.toByteArray();
     }
 
-    private void sendBytes(byte[] bytes) throws IOException{
+    /**
+     *
+     * @param data
+     * @throws IOException
+     */
 
-        if (bytes.length>0){
-            output.write(bytes);
+    private void sendBytes(byte[] data) throws IOException{
+
+        if (data.length>0){
+            output.write(data);
         }
         output.flush();
     }

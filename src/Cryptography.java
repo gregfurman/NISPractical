@@ -2,12 +2,10 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
-import java.util.zip.GZIPInputStream;
 
 
 public class Cryptography {
@@ -22,8 +20,7 @@ public class Cryptography {
     private CertificateAuthority CA;
 
     private PublicKey KUb;
-    private File file;
-    private String recieved_hash;
+
 
     public Cryptography() throws NoSuchAlgorithmException{
         CA = new CertificateAuthority();
@@ -41,6 +38,11 @@ public class Cryptography {
     }
 
 
+    public PublicKey generatePublicKey(byte[] key) throws Exception{
+        return
+                KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(key));
+    }
+
     public PublicKey getPublicKey(){
         return KU;
     }
@@ -49,6 +51,19 @@ public class Cryptography {
         return KR;
     }
 
+    public boolean isPublicKey(byte[] publicKey) throws Exception{
+        return KU.equals(generatePublicKey(publicKey));
+    }
+
+//    public byte[]
+
+    public boolean isSendersPublicKey(byte[] publicKey){
+        return Arrays.equals(publicKey,KUb.getEncoded());
+    }
+
+    public PublicKey getReceipientKey(){
+        return KUb;
+    }
     public SecretKey generateSecretKey() throws NoSuchAlgorithmException {
 
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
@@ -63,7 +78,7 @@ public class Cryptography {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
 
-        return cipher.doFinal(Base64.getEncoder().encode(data));
+        return cipher.doFinal(data);
 
 
     }
@@ -94,7 +109,7 @@ public class Cryptography {
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, secretKey,iv);
-        return Base64.getDecoder().decode(cipher.doFinal(data));
+        return cipher.doFinal(data);
 
     }
 
@@ -109,68 +124,31 @@ public class Cryptography {
 
         cipher.init(Cipher.ENCRYPT_MODE,KR);
 
-        byte[] encrypted_bytes = cipher.doFinal(M);
-
-        return Base64.getEncoder().encode(encrypted_bytes);
+        return cipher.doFinal(M);
 
     }
 
-    public byte[] publicKeyEncrypt(byte[] M) throws Exception {
+
+
+    public byte[] PublicKeyDecryptB(byte[] M)throws Exception{
         Cipher cipher = Cipher.getInstance(CIPHER_MODE);
 
-        cipher.init(Cipher.ENCRYPT_MODE,KU);
+        cipher.init(Cipher.DECRYPT_MODE,KUb);
 
-        byte[] encrypted_bytes = cipher.doFinal(M);
-
-        return Base64.getEncoder().encode(encrypted_bytes);
-
+        return cipher.doFinal(M);
     }
 
 
-    public String publicKeyEncryptB(String message) throws Exception {
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-        cipher.init(Cipher.ENCRYPT_MODE, KUb);
 
-        byte[] data = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
+    public byte[] sha512(byte[] data) throws Exception{
 
-        return Base64.getEncoder().encodeToString(data);
-    }
-
-    public String privateKeyDecrypt(byte[] M) throws Exception {
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-
-        cipher.init(Cipher.DECRYPT_MODE,KR);
-        System.out.println(M.length);
-
-        return new String(cipher.doFinal(M),StandardCharsets.UTF_8);
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        digest.reset();
+        digest.update(data);
+        return byteHex(digest.digest()).getBytes();
 
     }
 
-    public String publicKeyDecrypt(byte[] M) throws Exception {
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-
-        cipher.init(Cipher.DECRYPT_MODE,KR);
-
-
-        return new String(cipher.doFinal(M),"UTF8");
-
-    }
-
-    public String sha512(byte[] M){
-        // Generates hash of message
-        String H = "";
-        try{
-
-            MessageDigest digest = MessageDigest.getInstance("SHA-512");
-            digest.reset();
-            digest.update(M);
-            H = String.format("%040x", new BigInteger(1, digest.digest()));
-        }
-        catch(Exception E){
-            System.out.println("Hash Exception");
-        }
-        return H;
-    }
 
     public byte[] sha512File(File file) throws Exception{
 
@@ -190,6 +168,7 @@ public class Cryptography {
         catch(Exception e){
             System.out.println("oops");
         }
+
         return hash;
     }
 
@@ -201,9 +180,14 @@ public class Cryptography {
         return hexString.toString();
     }
 
-    public boolean checkHash(File file, String received_hash) throws Exception {
-        String new_hash = byteHex(sha512File(file));
-        return received_hash.equals(new_hash);
+    public boolean checkHash(byte[] data, byte[] received_hash) throws Exception {
+        byte[] new_hash = sha512(data);
+        return Arrays.equals(received_hash,new_hash);
+    }
+
+    public boolean checkHash(File file, byte[] received_hash) throws Exception {
+        byte[] new_hash = sha512File(file);
+        return Arrays.equals(received_hash,new_hash);
     }
 
     public CipherOutputStream cipherOut( OutputStream out) throws Exception{
