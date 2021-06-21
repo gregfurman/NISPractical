@@ -1,62 +1,90 @@
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
-import java.util.Base64;
-
 
 public class Cryptography {
 
-    private final int MAX_BLOCK_SIZE = 256;
-    private final int AES_BLOCK_SIZE = 32;
+    private final int AES_BLOCK_SIZE = 32; // Size of Cipher Block Chaining block
+    private final int AES_KEY_SIZE = 256; // Size of AES secret key. Larger sizes mean more security.
 
-    private final String CIPHER_MODE = "RSA/ECB/PKCS1Padding";
+    final String PUBLIC_KEY_ALGORITHM = "RSA/ECB/PKCS1Padding"; // Algorithm specs for public/private key encryption/decryption
+    final String MESSAGE_DIGEST_ALGORITHM = "SHA-512"; // Message Digest algorithm
+    final String SECRET_KEY_ALGORITHM = "AES/CBC/PKCS5Padding"; // Algorithms specs for ephemeral key
 
     private PublicKey KU;
     private PrivateKey KR;
-    private CertificateAuthority CA;
+    private RSAKeyGenerator keyGen;
 
     private PublicKey KUb;
 
-
+    /**
+     * Constructor method for Cryptography object. Contains methods relating to cryptographic processes.
+     * Upon instantiation, a public and private key are generated and set.
+     * @throws NoSuchAlgorithmException
+     */
     public Cryptography() throws NoSuchAlgorithmException{
-        CA = new CertificateAuthority();
-        KU = CA.getPublic();
-        KR = CA.getPrivate();
+        keyGen = new RSAKeyGenerator();
+        KU = keyGen.getPublic();
+        KR = keyGen.getPrivate();
 
     }
 
+    /**
+     * Method for setting the public key of a client to a given encoded public key.
+     * @param KUb Encoded public key object.
+     * @throws Exception Error thrown if public key fails to generate.
+     */
     public void setKUb(byte[] KUb) throws Exception {
-
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(KUb);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        this.KUb =  keyFactory.generatePublic(keySpec);
-
+        this.KUb = generatePublicKey(KUb);
     }
 
-
+    /**
+     * Method for generating a public key from a byte array.
+     * @param key encoded public key in byte array form.
+     * @return PublicKey object generated from byte array.
+     * @throws Exception Error thrown in key fails to successfully generate.
+     */
     public PublicKey generatePublicKey(byte[] key) throws Exception{
-        return
-                KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(key));
+        return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(key));
     }
 
+    /**
+     * Method for getting public key.
+     * @return public key returned as PublicKey object
+     */
     public PublicKey getPublicKey(){
         return KU;
     }
 
+    /**
+     * Method for getting private key.
+     * @return private key returned as PrivateKey object
+     */
     public PrivateKey getPrivateKey(){
         return KR;
     }
 
+    /**
+     * Method for checking if an input public key is the same as the current clients' key.
+     * Used for authentication.
+     * @param publicKey public key encoded as byte array.
+     * @return Boolean indicating if keys are equal.
+     * @throws Exception Error if key fails to generate.
+     */
     public boolean isPublicKey(byte[] publicKey) throws Exception{
         return KU.equals(generatePublicKey(publicKey));
     }
 
-//    public byte[]
 
+    /**
+     * Method for checking whether an input public key is equal to foreign public key.
+     * Used for authentication.
+     * @param publicKey Encoded PublicKey object.
+     * @return Boolean indicating if public keys are equal.
+     */
     public boolean isSendersPublicKey(byte[] publicKey){
         return Arrays.equals(publicKey,KUb.getEncoded());
     }
@@ -64,39 +92,49 @@ public class Cryptography {
     public PublicKey getReceipientKey(){
         return KUb;
     }
+
+
     public SecretKey generateSecretKey() throws NoSuchAlgorithmException {
 
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        keyGen.init(256);
+        keyGen.init(AES_KEY_SIZE);
         return keyGen.generateKey();
 
     }
 
     public byte[] encryptWithSecretKey(byte[] data, SecretKey secretKey, IvParameterSpec iv) throws Exception{
 
-
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
 
         return cipher.doFinal(data);
 
-
     }
 
+    /**
+     * Method for encrypting an AES secret key with public key of foreign party.
+     * @param secretKey Secret key object
+     * @return Encrypted secret key object.
+     * @throws Exception Error thrown if encryption error.
+     */
+    public byte[] encryptSecretKey(SecretKey secretKey) throws Exception{
 
-    public byte[] encryptSecretKey(SecretKey secretKey)throws Exception{
-
-        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, KUb);
 
         return cipher.doFinal(secretKey.getEncoded());
 
     }
 
+    /**
+     * Method to decrypt secret key.
+     * @param encodedSecretKey Encrypted secret key object as byte array.
+     * @return Decrypted secret key object.
+     * @throws Exception Throws if error occurs while decrypting or constructing key object
+     */
+    public SecretKey decryptSecretKey(byte[] encodedSecretKey) throws Exception{
 
-    public SecretKey decryptSecretKey(byte[] encodedSecretKey)throws Exception{
-
-        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
         cipher.init(Cipher.DECRYPT_MODE, KR);
 
         byte[] encryptedSecretKey = cipher.doFinal(encodedSecretKey);
@@ -105,22 +143,41 @@ public class Cryptography {
 
     }
 
+    /**
+     * Method to decrypt data using a secret key.
+     * @param data Data to be decrypted.
+     * @param secretKey Ephemeral AES secret key object
+     * @param iv Initialisation vector used for CBC decryption.
+     * @return Decrypted byte array.
+     * @throws Exception If error occurs while decrypting
+     */
     public byte[] decryptWithSecretKey(byte[] data,SecretKey secretKey, IvParameterSpec iv)throws Exception{
 
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
         cipher.init(Cipher.DECRYPT_MODE, secretKey,iv);
         return cipher.doFinal(data);
 
     }
 
+    /**
+     * Creates a 16 byte initialisation vector for Cipher Block Chaining encryption/decryption
+     * @return initialisation vector in the form of 16 byte array.
+     */
     public IvParameterSpec generateInitialisationVector() {
         byte[] IV = new byte[16];
         new SecureRandom().nextBytes(IV);
         return new IvParameterSpec(IV);
     }
 
+    /**
+     * Method to use private key to encrypt data M.
+     * @param M Data to be encrypted using private key.
+     * @return Encrypted byte array of M.
+     * @throws Exception If decryption fails.
+     */
+
     public byte[] privateKeyEncrypt(byte[] M) throws Exception {
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
+        Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
 
         cipher.init(Cipher.ENCRYPT_MODE,KR);
 
@@ -128,82 +185,29 @@ public class Cryptography {
 
     }
 
-
+    /**
+     * Method to use public key of other party to decrypt data M.
+     * @param M Data to be decrypted using public key of other party.
+     * @return Decrypted data
+     * @throws Exception If decryption fails.
+     */
 
     public byte[] PublicKeyDecryptB(byte[] M)throws Exception{
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
+        Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
 
         cipher.init(Cipher.DECRYPT_MODE,KUb);
 
         return cipher.doFinal(M);
     }
 
-
-
-    public byte[] sha512(byte[] data) throws Exception{
-
-        MessageDigest digest = MessageDigest.getInstance("SHA-512");
-        digest.reset();
-        digest.update(data);
-        return byteHex(digest.digest()).getBytes();
-
-    }
-
-
-    public byte[] sha512File(File file) throws Exception{
-
-        MessageDigest digest = MessageDigest.getInstance("SHA-512");
-        digest.reset();
-        byte[] hash = new byte[0];
-        try{
-            BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
-            DigestInputStream dis = new DigestInputStream(bis,digest);
-            while (dis.read() != -1) {
-            }
-            dis.close();
-            hash = digest.digest();
-
-        }
-
-        catch(Exception e){
-            System.out.println("oops");
-        }
-
-        return hash;
-    }
-
-    public String byteHex(byte[] data){
-        StringBuffer hexString = new StringBuffer();
-        for (int i = 0;i<data.length;i++) {
-            hexString.append(Integer.toHexString(0xFF & data[i]));
-        }
-        return hexString.toString();
-    }
-
-    public boolean checkHash(byte[] data, byte[] received_hash) throws Exception {
-        byte[] new_hash = sha512(data);
-        return Arrays.equals(received_hash,new_hash);
-    }
-
-    public boolean checkHash(File file, byte[] received_hash) throws Exception {
-        byte[] new_hash = sha512File(file);
-        return Arrays.equals(received_hash,new_hash);
-    }
-
-    public CipherOutputStream cipherOut( OutputStream out) throws Exception{
-
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-        cipher.init(Cipher.ENCRYPT_MODE, KUb);
-
-        return new CipherOutputStream(out, cipher);
-
-    }
-
-    public CipherInputStream cipherInput( InputStream in) throws Exception{
-
-        Cipher cipher = Cipher.getInstance(CIPHER_MODE);
-        cipher.init(Cipher.DECRYPT_MODE, KR);
-        return new CipherInputStream(in,cipher);
+    /**
+     * Checks if a given encoded Message Digest is equal to another Message Digest.
+     * @param MessageDigest1
+     * @param MessageDigest2
+     * @return A boolean indicating if two Message Digests are equal.
+     */
+    public boolean checkHash(byte[] MessageDigest1, byte[] MessageDigest2) {
+        return MessageDigest.isEqual(MessageDigest1,MessageDigest2);
     }
 
 
