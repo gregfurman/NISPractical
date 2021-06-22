@@ -77,7 +77,7 @@ public class Client {
     public static void main(String[] args){
 
         try {
-            Client client = new Client("127.0.0.1", 6666);
+            Client client = new Client(args[0], Integer.parseInt(args[1]));
 
             client.start();
 
@@ -308,7 +308,17 @@ public class Client {
 
         } else{
 
-            message = Message;
+            // Gets length of message (in bytes)
+            int messageLength =new BigInteger(Arrays.copyOfRange(Message,bytesRead,bytesRead+4)).intValue();
+            bytesRead +=4;
+
+            // Loads the actual message (in bytes)
+            message = Arrays.copyOfRange(Message,bytesRead,messageLength+bytesRead);
+            bytesRead+= messageLength;
+
+            // Updates the message digest from index 0 to the amount of bytes read
+            md.update(Arrays.copyOfRange(Message,0,bytesRead));
+
         }
 
         // Signature
@@ -535,7 +545,6 @@ public class Client {
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
         Signature.write(myPublicKey);
         Signature.write(crypto.privateKeyEncrypt(md.digest()));
-        System.out.println(Arrays.toString(md.digest()));
 
         sendBytes(Base64.getEncoder().encode(crypto.encryptWithSecretKey(compress(Signature.toByteArray()),key,iv)));
 
