@@ -76,7 +76,7 @@ public class Server{
     public static void main(String[] args){
 
         try {
-            Server server = new Server(6666);
+            Server server = new Server(Integer.parseInt(args[0]));
 
             server.start();
 
@@ -167,7 +167,8 @@ public class Server{
 
                     while (!(message = keyboardInput.readLine()).equals("quit")) {
 
-                        sendFile("GF-GN-GECCO-21-POSTER.png",message);
+                        sendMessage(message);
+//                        sendFile("GF-GN-GECCO-21-POSTER.png",message);
                     }
 
 
@@ -437,7 +438,16 @@ public class Server{
 
         } else{
 
-            message = Message;
+            // Gets length of message (in bytes)
+            int messageLength =new BigInteger(Arrays.copyOfRange(Message,bytesRead,bytesRead+4)).intValue();
+            bytesRead +=4;
+
+            // Loads the actual message (in bytes)
+            message = Arrays.copyOfRange(Message,bytesRead,messageLength+bytesRead);
+            bytesRead+= messageLength;
+
+            // Updates the message digest from index 0 to the amount of bytes read
+            md.update(Arrays.copyOfRange(Message,0,bytesRead));
         }
 
         // Signature
@@ -541,7 +551,6 @@ public class Server{
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
         Signature.write(myPublicKey);
         Signature.write(crypto.privateKeyEncrypt(md.digest()));
-        System.out.println(Arrays.toString(md.digest()));
 
         sendBytes(Base64.getEncoder().encode(crypto.encryptWithSecretKey(compress(Signature.toByteArray()),key,iv)));
 
