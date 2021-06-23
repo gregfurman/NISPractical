@@ -102,6 +102,7 @@ public class Cryptography {
      * @return  Secret Key object
      * @throws NoSuchAlgorithmException
      */
+
     public SecretKey generateSecretKey() throws NoSuchAlgorithmException {
 
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");

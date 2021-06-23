@@ -76,6 +76,7 @@ public class Server{
     public static final String ITALIC = "\033[3m";
     public static final String NORMAL = "\033[0m";
 
+
     /**
      * Main method of program. When run, the client socket will attempt to connect to a server
      * at a given IP and port number.
@@ -85,7 +86,7 @@ public class Server{
 
         try {
 
-            Server server = new Server(6666);
+            Server server = new Server(Integer.parseInt(args[0]));
 
             server.start();
 
@@ -137,6 +138,7 @@ public class Server{
 
                         System.out.println(ANSI_GREEN + "Bob: " + recieveInput(byteArray));
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
+
                     }
 
 
@@ -176,7 +178,6 @@ public class Server{
                     // readLine() blocks until some input is encountered.
                     // If a user inputs "quit", the loop terminates.
 
-
                         System.out.println(ANSI_PURPLE+"Welcome\nSend a message or type '-file' to send a file"+ANSI_RESET);
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
 
@@ -214,6 +215,7 @@ public class Server{
             //Creates a certificate and sends it to server
             X509Certificate myID = CertificateAuthority.createCertificate("CN=BOB, C=CapeTown, C=ZA", crypto.getPublicKey());
             System.out.println(ANSI_YELLOW + ITALIC + "Sending Alice my certificate (I'm Bob) " + ANSI_RESET);
+
             sendBytes(myID.getEncoded());
 
             // Received bytes from server and converts it to a certificate
@@ -256,6 +258,7 @@ public class Server{
     private void sendFile(String filename, String caption) throws Exception{
         int length=0;
 
+
         File file = new File(filename);
         if (!file.exists())
             throw new FileNotFoundException("File does not exist");
@@ -277,6 +280,7 @@ public class Server{
         length+=iv.getIV().length;
 
         length+=SessionKeyComponent.toByteArray().length;
+
         SessionKeyComponent.close();
 
         Cipher cipher = Cipher.getInstance(crypto.SECRET_KEY_ALGORITHM);
@@ -306,6 +310,7 @@ public class Server{
 
         // File length
         length+=file.length();
+
         byte[] fileLength = ByteBuffer.allocate(8).putLong(file.length()).array();
         Message.write(fileLength);
 
@@ -318,6 +323,7 @@ public class Server{
         Message.close();
 
         length+=crypto.encryptWithSecretKey(compress(Message.toByteArray()),key,iv).length;
+
 
         Message.close();
 
@@ -356,6 +362,7 @@ public class Server{
         byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
         Signature.write(timeStamp);
         length+=md.getDigestLength();
+
 
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
         Signature.write(myPublicKey);
@@ -480,12 +487,14 @@ public class Server{
         // Signature
         byte[] Signature = decompress(crypto.decryptWithSecretKey(Base64.getDecoder().decode(receiveBytes()),key,iv));
         System.out.println(ITALIC +"Decrypted signature = " + Signature + NORMAL);
+
         bytesRead = 0;
 
         Date timestamp = new Date(new BigInteger(Arrays.copyOfRange(Signature,bytesRead, bytesRead+4)).intValue());
         bytesRead+= 4;
         Date now = new Date();
         long SecondsToArrive= ((now.getTime()- timestamp.getTime() )/1000)%60;
+        System.out.println(now.toString() + " " + timestamp.toString());
 
         // If takes longer than 60 seconds timeout
         if (SecondsToArrive > 60)
@@ -508,6 +517,7 @@ public class Server{
 
     }
 
+
     /**
      * Method to encrypt a string message using AES ecnryption with an ephemeral session key and
      * initialisation vector. The resulting message, key, and IV are sent as bytes to the client.
@@ -518,11 +528,13 @@ public class Server{
         ByteArrayOutputStream SessionKeyComponent = new ByteArrayOutputStream();
 
         byte[] recipientPublicKey = crypto.getReceipientKey().getEncoded();
+
         SessionKeyComponent.write(recipientPublicKey);
 
         SecretKey key = crypto.generateSecretKey();
         byte[] encryptedKey = crypto.encryptSecretKey(key);
         SessionKeyComponent.write(encryptedKey);
+
 
         // adding init vector - maybe encrypt?
         IvParameterSpec iv = crypto.generateInitialisationVector();
@@ -554,7 +566,6 @@ public class Server{
         md.update(Message.toByteArray());
         Message.close();
 
-
         Message.close();
 
         // for synch. purposes
@@ -566,7 +577,6 @@ public class Server{
         Date today = new Date();
         byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
         Signature.write(timeStamp);
-
 
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
         Signature.write(myPublicKey);
@@ -580,6 +590,7 @@ public class Server{
         System.out.println("Initialization Vector (" + iv.getIV().length + " Bytes): " + iv.getIV());
         System.out.println("Encrypted Message (" + crypto.encryptWithSecretKey(compress(Message.toByteArray()),key,iv).length + " Bytes): " + crypto.encryptWithSecretKey(compress(Message.toByteArray()), key, iv));
         System.out.println("Encrypted Message Digest (" + crypto.privateKeyEncrypt(md.digest()).length + " Bytes): " + crypto.privateKeyEncrypt(md.digest()) + NORMAL);
+
         Signature.close();
 
 
