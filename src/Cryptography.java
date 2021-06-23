@@ -89,10 +89,19 @@ public class Cryptography {
         return Arrays.equals(publicKey,KUb.getEncoded());
     }
 
+    /**
+     * getMethod for returning a Public Key
+     * @return Public Key Object
+     */
     public PublicKey getReceipientKey(){
         return KUb;
     }
 
+    /**
+     * Method for generating Secret Key
+     * @return  Secret Key object
+     * @throws NoSuchAlgorithmException
+     */
 
     public SecretKey generateSecretKey() throws NoSuchAlgorithmException {
 
@@ -102,6 +111,14 @@ public class Cryptography {
 
     }
 
+    /**
+     * Method for encrypting data using Secret Key
+     * @param data Message/File data to be encrypted
+     * @param secretKey Secret key object
+     * @param iv Initiralization vector used for encryptin
+     * @return  Encrypted byte array
+     * @throws Exception
+     */
     public byte[] encryptWithSecretKey(byte[] data, SecretKey secretKey, IvParameterSpec iv) throws Exception{
 
         Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
