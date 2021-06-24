@@ -1,6 +1,7 @@
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
@@ -19,6 +20,15 @@ public class Cryptography {
     private RSAKeyGenerator keyGen;
 
     private PublicKey KUb;
+
+    public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ITALIC = "\033[3m";
+    public static final String NORMAL = "\033[0m";
+
 
     /**
      * Constructor method for Cryptography object. Contains methods relating to cryptographic processes.
@@ -75,6 +85,10 @@ public class Cryptography {
      * @throws Exception Error if key fails to generate.
      */
     public boolean isPublicKey(byte[] publicKey) throws Exception{
+        System.out.println(ITALIC +"Verifying public key...");
+        System.out.println(ITALIC + "Received KU: " + bytesToHex(publicKey));
+        System.out.println(ITALIC + "Stored KU: " + bytesToHex(KU.getEncoded()));
+
         return KU.equals(generatePublicKey(publicKey));
     }
 
@@ -86,6 +100,10 @@ public class Cryptography {
      * @return Boolean indicating if public keys are equal.
      */
     public boolean isSendersPublicKey(byte[] publicKey){
+        System.out.println(ITALIC +"Verifying sender public key...");
+        System.out.println(ITALIC + "Received KU: " + bytesToHex(publicKey));
+        System.out.println(ITALIC + "Stored KU: " + bytesToHex(KUb.getEncoded()));
+
         return Arrays.equals(publicKey,KUb.getEncoded());
     }
 
@@ -94,6 +112,8 @@ public class Cryptography {
      * @return Public Key Object
      */
     public PublicKey getReceipientKey(){
+        System.out.println(ITALIC + "Recipient Public Key (" + KUb.getEncoded().length + " Bytes): " + bytesToHex(KUb.getEncoded()));
+
         return KUb;
     }
 
@@ -121,10 +141,15 @@ public class Cryptography {
      */
     public byte[] encryptWithSecretKey(byte[] data, SecretKey secretKey, IvParameterSpec iv) throws Exception{
 
+        System.out.println(ITALIC +"Unencrypted data (" + data.length + " Bytes): " + bytesToHex(data));
+
         Cipher cipher = Cipher.getInstance(SECRET_KEY_ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
 
-        return cipher.doFinal(data);
+        byte[] encryptedData = cipher.doFinal(data);
+        System.out.println(ITALIC +"Secret Key Encrypted Data (" + encryptedData.length + " Bytes): " + bytesToHex(encryptedData));
+
+        return encryptedData;
 
     }
 
@@ -136,8 +161,13 @@ public class Cryptography {
      */
     public byte[] encryptSecretKey(SecretKey secretKey) throws Exception{
 
+        System.out.println(ITALIC +"Secret key (" + secretKey.getEncoded().length + " Bytes): " + bytesToHex(secretKey.getEncoded()));
         Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, KUb);
+
+        byte[] encryptedSecretKey = cipher.doFinal(secretKey.getEncoded());
+
+        System.out.println(ITALIC +"Encrypted secret key (" + encryptedSecretKey.length + " Bytes): " + bytesToHex(encryptedSecretKey));
 
         return cipher.doFinal(secretKey.getEncoded());
 
@@ -150,13 +180,17 @@ public class Cryptography {
      * @throws Exception Throws if error occurs while decrypting or constructing key object
      */
     public SecretKey decryptSecretKey(byte[] encodedSecretKey) throws Exception{
+        System.out.println(ITALIC +"Encrypted secret key (" + encodedSecretKey.length + " Bytes): " + bytesToHex(encodedSecretKey));
 
         Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
         cipher.init(Cipher.DECRYPT_MODE, KR);
 
         byte[] encryptedSecretKey = cipher.doFinal(encodedSecretKey);
 
-        return new SecretKeySpec(encryptedSecretKey, 0, AES_BLOCK_SIZE, "AES");
+        SecretKeySpec secretKey = new SecretKeySpec(encryptedSecretKey, 0, AES_BLOCK_SIZE, "AES");
+        System.out.println(ITALIC +"Decrypted secret key (" + secretKey.getEncoded().length + " Bytes): " + bytesToHex(secretKey.getEncoded()));
+
+        return secretKey;
 
     }
 
@@ -183,7 +217,10 @@ public class Cryptography {
     public IvParameterSpec generateInitialisationVector() {
         byte[] IV = new byte[16];
         new SecureRandom().nextBytes(IV);
-        return new IvParameterSpec(IV);
+        IvParameterSpec iv =  new IvParameterSpec(IV);
+        System.out.println("Initialization Vector (" + IV.length + " Bytes): " + bytesToHex(iv.getIV()));
+
+        return iv;
     }
 
     /**
@@ -196,9 +233,14 @@ public class Cryptography {
     public byte[] privateKeyEncrypt(byte[] M) throws Exception {
         Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
 
+        System.out.println(ITALIC +"Unencrypted Message Digest (" + M.length + " Bytes): " + bytesToHex(M));
+
         cipher.init(Cipher.ENCRYPT_MODE,KR);
 
-        return cipher.doFinal(M);
+        byte[] encryptedM = cipher.doFinal(M);
+        System.out.println(ITALIC +"Private Key Encrypted Message Digest (" + encryptedM.length + " Bytes): " + bytesToHex(encryptedM));
+
+        return encryptedM;
 
     }
 
@@ -210,11 +252,18 @@ public class Cryptography {
      */
 
     public byte[] PublicKeyDecryptB(byte[] M)throws Exception{
+
+        System.out.println(ITALIC +"Encrypted Message Digest (" + M.length + " Bytes): " + bytesToHex(M));
+
         Cipher cipher = Cipher.getInstance(PUBLIC_KEY_ALGORITHM);
 
         cipher.init(Cipher.DECRYPT_MODE,KUb);
 
-        return cipher.doFinal(M);
+        byte[] md = cipher.doFinal(M);
+
+        System.out.println(ITALIC +"Decrypted Message Digest (" + md.length + " Bytes): " + bytesToHex(md));
+
+        return md;
     }
 
     /**
@@ -227,5 +276,27 @@ public class Cryptography {
         return MessageDigest.isEqual(MessageDigest1,MessageDigest2);
     }
 
+
+    /**
+     * Convert a byte array into readable hex form
+     * @param bytes
+     * @return String of byte array
+     */
+    private String bytesToHex(byte[] bytes) {
+        return DatatypeConverter.printHexBinary(bytes);
+    }
+
+    /**
+     * Code for generating an encoded initialisation vector from a byte array.
+     * @param iv encoded initialisation vector
+     * @return Initialisation vector object
+     */
+    public IvParameterSpec decodeInitialisationVector(byte[] iv){
+
+        IvParameterSpec IV = new IvParameterSpec(iv);
+
+        return IV;
+
+    }
 
 }

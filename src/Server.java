@@ -8,6 +8,8 @@ import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
@@ -68,6 +70,8 @@ public class Server{
 
     private Cryptography crypto; // Attribute that contains all cryptographic methods.
 
+    private final String HOME_DIRECTORY = "SERVER_HOME";
+
     public static final String ANSI_YELLOW = "\u001B[33m";
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_GREEN = "\u001B[32m";
@@ -87,6 +91,7 @@ public class Server{
         try {
 
             Server server = new Server(Integer.parseInt(args[0]));
+            Files.createDirectories(Paths.get(server.HOME_DIRECTORY));
 
             server.start();
 
@@ -195,6 +200,7 @@ public class Server{
                         }
 
                 } catch (Exception e) {
+                    System.out.println(NORMAL);
                     System.out.println("An error occurred: disconnecting from server.");
                 }
 
@@ -256,30 +262,26 @@ public class Server{
      * @param filename String filename of file to be sent.
      */
     private void sendFile(String filename, String caption) throws Exception{
-        int length=0;
 
-
-        File file = new File(filename);
+        File file = new File(HOME_DIRECTORY + "/"+filename);
         if (!file.exists())
             throw new FileNotFoundException("File does not exist");
+
+        System.out.println(ITALIC);
 
         ByteArrayOutputStream SessionKeyComponent = new ByteArrayOutputStream();
 
         byte[] recipientPublicKey = crypto.getReceipientKey().getEncoded();
-        length+=recipientPublicKey.length;
         SessionKeyComponent.write(recipientPublicKey);
 
         SecretKey key = crypto.generateSecretKey();
         byte[] encryptedKey = crypto.encryptSecretKey(key);
         SessionKeyComponent.write(encryptedKey);
-        length+=encryptedKey.length;
 
         // adding init vector - maybe encrypt?
         IvParameterSpec iv = crypto.generateInitialisationVector();
         SessionKeyComponent.write(iv.getIV());
-        length+=iv.getIV().length;
 
-        length+=SessionKeyComponent.toByteArray().length;
 
         SessionKeyComponent.close();
 
@@ -309,8 +311,6 @@ public class Server{
         Message.write(filenameBytes);
 
         // File length
-        length+=file.length();
-
         byte[] fileLength = ByteBuffer.allocate(8).putLong(file.length()).array();
         Message.write(fileLength);
 
@@ -322,15 +322,12 @@ public class Server{
         md.update(Message.toByteArray());
         Message.close();
 
-        length+=crypto.encryptWithSecretKey(compress(Message.toByteArray()),key,iv).length;
-
-
         Message.close();
 
 
         try{
 
-            FileInputStream fis = new FileInputStream(filename);
+            FileInputStream fis = new FileInputStream(HOME_DIRECTORY +"/"+ filename);
             UnclosingOutputStream nos = new UnclosingOutputStream(output);
             Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION,true);
             DeflaterOutputStream dos = new DeflaterOutputStream(nos,deflater,true);
@@ -361,7 +358,7 @@ public class Server{
         Date today = new Date();
         byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
         Signature.write(timeStamp);
-        length+=md.getDigestLength();
+
 
 
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
@@ -371,17 +368,9 @@ public class Server{
         sendBytes(Base64.getEncoder().encode(crypto.encryptWithSecretKey(compress(Signature.toByteArray()),key,iv)));
 
 
-        length+=Signature.toByteArray().length;
-        System.out.println(ITALIC + "Encrypted Public Key (" + recipientPublicKey.length + " Bytes): " + recipientPublicKey);
-        System.out.println("Encrypted Session Key (" + encryptedKey.length + " Bytes): " + encryptedKey);
-        System.out.println("Initialization Vector (" + iv.getIV().length + " Bytes): " + iv.getIV());
-        System.out.println("Encrypted Message (" + crypto.encryptWithSecretKey(compress(Message.toByteArray()),key,iv).length + " Bytes): " + crypto.encryptWithSecretKey(compress(Message.toByteArray()), key, iv));
-        System.out.println("Encrypted Message Digest (" + crypto.privateKeyEncrypt(md.digest()).length + " Bytes): " + crypto.privateKeyEncrypt(md.digest()) + NORMAL);
-
-
-
         Signature.close();
 
+        System.out.println(NORMAL);
 
     }
 
@@ -397,20 +386,20 @@ public class Server{
         // Length of byte array of public key object in java is 294 bytes. Go figure.
 
         // Session component
+        System.out.println("Processing Session Component of PGP Message");
+
         byte[] publicKey = Arrays.copyOfRange(decodedData,0,294);
-        System.out.println(ITALIC + "\nDecrypted Public Key: " + publicKey);
 
         if (!crypto.isPublicKey(publicKey))
             throw new Exception("Destination ID is incorrect.");
 
         SecretKey key = crypto.decryptSecretKey(Arrays.copyOfRange(decodedData,294,550));
-        System.out.println(ITALIC + "Decrypted Secret Key: " + key.getEncoded());
-        IvParameterSpec iv = new IvParameterSpec(Arrays.copyOfRange(decodedData,550,566)); // Maybe decrypt?
-        System.out.println(ITALIC + "Received init. vector: " + iv.getIV());
+        IvParameterSpec iv = crypto.decodeInitialisationVector(Arrays.copyOfRange(decodedData,550,566)); // Maybe decrypt?
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, key,iv);
 
+        System.out.println("Processing Message component of PGP Message");
 
         // Message
         byte[] Message = decompress(crypto.decryptWithSecretKey(Arrays.copyOfRange(decodedData,566,decodedData.length),key,iv));
@@ -422,7 +411,6 @@ public class Server{
 
         byte[] message=null;
         MessageDigest md = MessageDigest.getInstance(crypto.MESSAGE_DIGEST_ALGORITHM);
-        System.out.print(ITALIC + "Decrypted Message Digest: " + md);
 
         if (isFile) {
             // Length of caption string in byte form to allow for reading from data
@@ -448,7 +436,7 @@ public class Server{
 
             md.update(Arrays.copyOfRange(Message,0,bytesRead));
 
-            try( FileOutputStream fout = new FileOutputStream("test_" +filename);){
+            try( FileOutputStream fout = new FileOutputStream(HOME_DIRECTORY+ "/" +filename);){
 
                 Inflater inflater = new Inflater(true);
                 InflaterInputStream inf = new InflaterInputStream(input,inflater);
@@ -456,16 +444,20 @@ public class Server{
 
                 byte[] buffer = new byte[512];
                 int count;
+                long readBytes = 0;
                 while ((count = Cin.read(buffer)) >0){
 
                     fout.write(buffer, 0, count);
                     md.update(buffer,0,count);
-
+                    readBytes += count;
                 }
 
+                if (fileLength != readBytes){
+                    throw new Exception();
+                }
 
             }catch (Exception e){
-                e.printStackTrace();
+                System.out.println("Failed to receive file.");
             }
 
 
@@ -486,7 +478,6 @@ public class Server{
 
         // Signature
         byte[] Signature = decompress(crypto.decryptWithSecretKey(Base64.getDecoder().decode(receiveBytes()),key,iv));
-        System.out.println(ITALIC +"Decrypted signature = " + Signature + NORMAL);
 
         bytesRead = 0;
 
@@ -583,13 +574,6 @@ public class Server{
         Signature.write(crypto.privateKeyEncrypt(md.digest()));
 
         sendBytes(Base64.getEncoder().encode(crypto.encryptWithSecretKey(compress(Signature.toByteArray()),key,iv)));
-
-
-        System.out.println(ITALIC + "Encrypted Public Key (" + recipientPublicKey.length + " Bytes): " + recipientPublicKey);
-        System.out.println("Encrypted Session Key (" + encryptedKey.length + " Bytes): " + encryptedKey);
-        System.out.println("Initialization Vector (" + iv.getIV().length + " Bytes): " + iv.getIV());
-        System.out.println("Encrypted Message (" + crypto.encryptWithSecretKey(compress(Message.toByteArray()),key,iv).length + " Bytes): " + crypto.encryptWithSecretKey(compress(Message.toByteArray()), key, iv));
-        System.out.println("Encrypted Message Digest (" + crypto.privateKeyEncrypt(md.digest()).length + " Bytes): " + crypto.privateKeyEncrypt(md.digest()) + NORMAL);
 
         Signature.close();
 
