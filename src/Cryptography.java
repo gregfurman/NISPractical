@@ -273,6 +273,11 @@ public class Cryptography {
      * @return A boolean indicating if two Message Digests are equal.
      */
     public boolean checkHash(byte[] MessageDigest1, byte[] MessageDigest2) {
+
+        System.out.println(ITALIC +"Checking if calculated and decrypted message digests (MDs) are equal...");
+        System.out.println(ITALIC + "Calculated MD: " + bytesToHex(MessageDigest1));
+        System.out.println(ITALIC + "Decrypted MD: " + bytesToHex(MessageDigest2));
+
         return MessageDigest.isEqual(MessageDigest1,MessageDigest2);
     }
 

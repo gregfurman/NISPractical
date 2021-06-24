@@ -355,11 +355,10 @@ public class Client {
 
         bytesRead = 0;
 
-        Date timestamp = new Date(new BigInteger(Arrays.copyOfRange(Signature,bytesRead, bytesRead+4)).intValue());
-        bytesRead+= 4;
+        Date timestamp = new Date(ByteBuffer.wrap(Arrays.copyOfRange(Signature,bytesRead,bytesRead+8)).getLong());
+        bytesRead+= 8;
         Date now = new Date();
         long SecondsToArrive= ((now.getTime()- timestamp.getTime() )/1000)%60;
-        System.out.println(now.toString() + " " + timestamp.toString());
 
         // If takes longer than 60 seconds timeout
         if (SecondsToArrive > 60)
@@ -479,9 +478,9 @@ public class Client {
         // Signature
         ByteArrayOutputStream Signature = new ByteArrayOutputStream();
 
-        // converting hash of datetime to 32 byte array
+        // converting hash of datetime to 8 byte array
         Date today = new Date();
-        byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
+        byte[] timeStamp =  ByteBuffer.allocate(8).putLong(today.getTime()).array();
         Signature.write(timeStamp);
 
         byte[] myPublicKey = crypto.getPublicKey().getEncoded();
@@ -550,9 +549,9 @@ public class Client {
         // Signature
         ByteArrayOutputStream Signature = new ByteArrayOutputStream();
 
-        // converting hash of datetime to 32 byte array
+        // converting hash of datetime to 8 byte array
         Date today = new Date();
-        byte[] timeStamp =  ByteBuffer.allocate(4).putInt(new Date(today.getTime()).hashCode()).array();
+        byte[] timeStamp =  ByteBuffer.allocate(8).putLong(today.getTime()).array();
         Signature.write(timeStamp);
 
 
