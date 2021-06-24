@@ -78,8 +78,8 @@ public class Server{
 
 
     /**
-     * Main method of program. When run, the client socket will attempt to connect to a server
-     * at a given IP and port number.
+     * Main method of program. When run, the server socket will await a client
+     * connection.
      * @param args Arguments to the program.
      */
     public static void main(String[] args){
@@ -136,7 +136,7 @@ public class Server{
                     // While loop that blocks on the receiveByres method.
                     while ((byteArray = receiveBytes()) != null) {
 
-                        System.out.println(ANSI_GREEN + "Bob: " + recieveInput(byteArray));
+                        System.out.println(ANSI_GREEN + "Bob: " + receiveInput(byteArray));
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
 
                     }
@@ -146,11 +146,8 @@ public class Server{
                     clientSocket.close();
 
 
-                } catch (IOException e){
-                    System.out.println("Client disconnected.");
                 } catch (Exception e){
-                    e.printStackTrace();
-                    System.out.println("Fatal error: decryption failed.");
+                    System.out.println("Client disconnected.");
                 }
                 System.exit(0);
 
@@ -181,21 +178,24 @@ public class Server{
                         System.out.println(ANSI_PURPLE+"Welcome\nSend a message or type '-file' to send a file"+ANSI_RESET);
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
 
-                        while (!(message = keyboardInput.readLine()).equals("quit")) {
+                        while (!(message = keyboardInput.readLine()).equals("-quit")) {
                             if (message.equals("-file")) {
                                 System.out.println(ANSI_BLUE+"Enter filename:");
                                 String fileName = keyboardInput.readLine();
                                 System.out.println("Enter caption:"+ANSI_RESET);
                                 String caption = keyboardInput.readLine();
                                 sendFile(fileName, caption);
-                            } else {
+                            } else if(message.equals("-quit")) {
+                                break;
+                            }
+                            else{
                                 sendMessage(message);
                             }
                             System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
                         }
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("An error occurred: disconnecting from server.");
                 }
 
                 System.exit(0);
@@ -214,7 +214,7 @@ public class Server{
 
             //Creates a certificate and sends it to server
             X509Certificate myID = CertificateAuthority.createCertificate("CN=BOB, C=CapeTown, C=ZA", crypto.getPublicKey());
-            System.out.println(ANSI_YELLOW + ITALIC + "Sending Alice my certificate (I'm Bob) " + ANSI_RESET);
+            System.out.println(ANSI_YELLOW + ITALIC + "Sending Bob my certificate (I'm Alice) " + ANSI_RESET);
 
             sendBytes(myID.getEncoded());
 
@@ -223,16 +223,16 @@ public class Server{
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
             Certificate certificate = cf.generateCertificate(aliceCertificate);
-            System.out.println(ANSI_YELLOW + ITALIC + "Received alice's certificate");
+            System.out.println(ANSI_YELLOW + ITALIC + "Received Bob's certificate");
 
             // Retrieves authorities public key and verifies the certificate
             PublicKey AuthorityPubKey = CertificateAuthority.getPublicKey();
             certificate.verify(AuthorityPubKey);
-            System.out.println(ANSI_YELLOW + ITALIC + "Verified alice's certificate");
+            System.out.println(ANSI_YELLOW + ITALIC + "Verified Bob's certificate");
 
             // Retrieves server public key from the certificate and saves it.
             crypto.setKUb(certificate.getPublicKey().getEncoded());
-            System.out.println(ANSI_YELLOW + ITALIC + "Received alice's public key" + ANSI_RESET);
+            System.out.println(ANSI_YELLOW + ITALIC + "Received Bob's public key" + ANSI_RESET);
 
 
 
@@ -390,7 +390,7 @@ public class Server{
      * @param rawMessageData
      * @return byte array of decrypted message.
      */
-    private String recieveInput(byte[] rawMessageData) throws Exception{
+    private String receiveInput(byte[] rawMessageData) throws Exception{
 
         byte[] decodedData = Base64.getDecoder().decode(rawMessageData);
 

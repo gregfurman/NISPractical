@@ -135,7 +135,7 @@ public class Client {
                     while ((byteArray = receiveBytes()) != null) {
 
                         // Decryption!!
-                        System.out.println(NORMAL + ANSI_GREEN + "Alice: " + recieveInput(byteArray));
+                        System.out.println(NORMAL + ANSI_GREEN + "Alice: " + receiveInput(byteArray));
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
 
 //                        System.out.println(new String(decryptMessage(byteArray)));
@@ -144,13 +144,8 @@ public class Client {
 
                     clientSocket.close();
 
-                } catch (IOException e) {
-                    System.out.println("Client disconnected.");
-                    e.printStackTrace();
-
                 } catch (Exception e) {
-                    System.out.println("Fatal error: decryption failed.");
-                    e.printStackTrace();
+                    System.out.println("Server disconnected.");
                 }
 
                 System.exit(0);
@@ -180,14 +175,17 @@ public class Client {
                     System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
 
 
-                    while (!(message = keyboardInput.readLine()).equals("quit")) {
+                    while (!(message = keyboardInput.readLine()).equals("-quit")) {
                         if (message.equals("-file")) {
                             System.out.println(ANSI_BLUE+"Enter filename:");
                             String fileName = keyboardInput.readLine();
                             System.out.println("Enter caption:"+ANSI_RESET);
                             String caption = keyboardInput.readLine();
                             sendFile(fileName, caption);
-                        } else {
+                        } else if(message.equals("-quit")) {
+                            break;
+                        }
+                        else{
                             sendMessage(message);
                         }
                         System.out.print(ANSI_BLUE+"Me: "+ANSI_RESET);
@@ -195,7 +193,7 @@ public class Client {
 
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("An error occurred: disconnecting from server.");
                 }
 
                 System.exit(0);
@@ -220,16 +218,16 @@ public class Client {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
             Certificate certificate = cf.generateCertificate(aliceCertificate);
-            System.out.println(ANSI_YELLOW + ITALIC + "Received alice's certificate");
+            System.out.println(ANSI_YELLOW + ITALIC + "Received Alice's certificate");
 
             // Retrieves authorities public key and verifies the certificate
             PublicKey AuthorityPubKey = CertificateAuthority.getPublicKey();
             certificate.verify(AuthorityPubKey);
-            System.out.println(ANSI_YELLOW + ITALIC + "Verified alice's certificate");
+            System.out.println(ANSI_YELLOW + ITALIC + "Verified Alice's certificate");
 
             // Retrieves server public key from the certificate and saves it.
             crypto.setKUb(certificate.getPublicKey().getEncoded());
-            System.out.println(ANSI_YELLOW + ITALIC + "Received alice's public key" + ANSI_RESET);
+            System.out.println(ANSI_YELLOW + ITALIC + "Received Alice's public key" + ANSI_RESET);
 
 
         
@@ -252,7 +250,7 @@ public class Client {
      * @param rawMessageData
      * @return byte array of decrypted message.
      */
-    private String recieveInput(byte[] rawMessageData) throws Exception{
+    private String receiveInput(byte[] rawMessageData) throws Exception{
 
         byte[] decodedData = Base64.getDecoder().decode(rawMessageData);
 
