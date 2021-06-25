@@ -4,8 +4,8 @@ DOCDIR=./javadocs
 
 
 default:
-	javac ${SRCDIR}/CertificateAuthority.java --add-exports java.base/sun.security.x509=ALL-UNNAMED -Xlint:-deprecation -cp ${BINDIR} -d ${BINDIR}
-	javac ${SRCDIR}/RSAKeyGenerator.java ${SRCDIR}/Cryptography.java ${SRCDIR}/Server.java ${SRCDIR}/Client.java -cp ${BINDIR} -d ${BINDIR}
+	javac ${SRCDIR}/RSAKeyGenerator.java ${SRCDIR}/CertificateAuthority.java --add-exports java.base/sun.security.x509=ALL-UNNAMED -cp ${OUTDIR} -d ${OUTDIR}
+	javac ${SRCDIR}/Cryptography.java ${SRCDIR}/Participant.java ${SRCDIR}/Server.java ${SRCDIR}/Client.java -cp ${OUTDIR} -d ${OUTDIR}
 
 clean:
 	rm -f ${BINDIR}/*.class
