@@ -288,7 +288,12 @@ public class Cryptography {
      * @return String of byte array
      */
     private String bytesToHex(byte[] bytes) {
-        return DatatypeConverter.printHexBinary(bytes);
+
+        StringBuffer hexString = new StringBuffer();
+        for (int i = 0;i<bytes.length;i++) {
+            hexString.append(Integer.toHexString(0xFF & bytes[i]));
+        }
+        return hexString.toString();
     }
 
     /**
