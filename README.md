@@ -15,8 +15,9 @@ make #compiles (Warnings are displayed, please ignore)
 #navigate to out folder
 cd out
 
-#runs the methods for the certificate authority.
-#Generates files used storing  the CA public and private keys
+#Runs the methods for the certificate authority.
+#Generates files used storing the CA public and private keys. If testing on two separate machine, only run this command once and ensure both participants have the 
+#same pairing key documents. 
 java CertificateAuthority 
 
 #Runs the server  
