@@ -211,7 +211,7 @@ public class Participant{
 
                 } catch (Exception e) {
                     System.out.println(NORMAL);
-                    System.out.println("An error occurred: disconnecting from server.");
+                    System.out.println("An error occurred: disconnecting.");
                 }
 
                 System.exit(0);
@@ -228,13 +228,13 @@ public class Participant{
 
         try {
 
-            //Creates a certificate and sends it to server
+            //Creates a certificate and sends it to participant
             X509Certificate myID = CertificateAuthority.createCertificate("CN="+other+", C=CapeTown, C=ZA", crypto.getPublicKey());
             System.out.println(ANSI_YELLOW + ITALIC + "Sending "+other+" my certificate (I'm "+name+ ") " + ANSI_RESET);
 
             sendBytes(myID.getEncoded());
 
-            // Received bytes from server and converts it to a certificate
+            // Received bytes from participant and converts it to a certificate
             byte [] senderCertificate = receiveBytes();
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             ByteArrayInputStream aliceCertificate = new ByteArrayInputStream(senderCertificate);
@@ -246,7 +246,7 @@ public class Participant{
             certificate.verify(AuthorityPubKey);
             System.out.println(ANSI_YELLOW + ITALIC + "Verified " + other+ "'s certificate");
 
-            // Retrieves server public key from the certificate and saves it.
+            // Retrieves participant public key from the certificate and saves it.
             crypto.setKUb(certificate.getPublicKey().getEncoded());
             System.out.println(ANSI_YELLOW + ITALIC + "Received " +other+ "'s public key" + ANSI_RESET);
 
@@ -266,7 +266,7 @@ public class Participant{
 
 
     /**
-     * Method to encrypt a string message using AES ecnryption with an ephemeral session key and
+     * Method to encrypt a string message using AES encryption with an ephemeral session key and
      * initialisation vector. The resulting message, key, and IV are sent as bytes to the participant.
      * @param caption String message to encrypted and sent to participant.
      * @param filename String filename of file to be sent.
