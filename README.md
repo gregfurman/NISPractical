@@ -12,6 +12,7 @@ make #compiles (Warnings are displayed, please ignore)
 ## Usage
 
 ```bash
+#navigate to out folder
 cd out
 
 #runs the methods for the certificate authority.
