@@ -1,7 +1,6 @@
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import javax.xml.bind.DatatypeConverter;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
@@ -21,14 +20,7 @@ public class Cryptography {
 
     private PublicKey KUb;
 
-    public static final String ANSI_YELLOW = "\u001B[33m";
-    public static final String ANSI_RESET = "\u001B[0m";
-    public static final String ANSI_GREEN = "\u001B[32m";
-    public static final String ANSI_BLUE = "\u001B[34m";
-    public static final String ANSI_PURPLE = "\u001B[35m";
     public static final String ITALIC = "\033[3m";
-    public static final String NORMAL = "\033[0m";
-
 
     /**
      * Constructor method for Cryptography object. Contains methods relating to cryptographic processes.
@@ -288,7 +280,12 @@ public class Cryptography {
      * @return String of byte array
      */
     private String bytesToHex(byte[] bytes) {
-        return DatatypeConverter.printHexBinary(bytes);
+
+        StringBuffer hexString = new StringBuffer();
+        for (int i = 0;i<bytes.length;i++) {
+            hexString.append(Integer.toHexString(0xFF & bytes[i]));
+        }
+        return hexString.toString();
     }
 
     /**
